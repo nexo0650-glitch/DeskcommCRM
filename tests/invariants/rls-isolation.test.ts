@@ -232,6 +232,15 @@ beforeAll(() => {
                     (select id from public.crm_leads where organization_id = v_org limit 1));
         end if;
 
+        -- migration 0232 — chave de provedor de mapa (geocodificação/distância
+        -- do cálculo de orçamento de remoção). Cifrado real não importa aqui:
+        -- a prova é de isolamento de linha, não de decrypt.
+        if not exists (select 1 from public.map_provider_credentials where organization_id = v_org) then
+          insert into public.map_provider_credentials
+            (organization_id, provider, label, api_key_encrypted, api_key_iv, api_key_tag, api_key_last4)
+            values (v_org, 'openrouteservice', 'RLS invariant', '\\x00'::bytea, '\\x00'::bytea, '\\x00'::bytea, '0000');
+        end if;
+
         if not exists (select 1 from public.push_subscriptions where organization_id = v_org) then
           insert into public.push_subscriptions
             (organization_id, user_id, endpoint, p256dh, auth)
@@ -294,6 +303,11 @@ export const TABLES = [
   "crm_tasks",
   // 0227 — texto de sugestões: org + visibilidade da conversa por authenticated.
   "ai_reply_drafts",
+  // 0232 — chave de provedor de mapa (cálculo de distância de remoção). Leitura
+  // é org-scoped sem gate de papel (mesma forma de catalog_products); a
+  // decifragem em si nunca sai do servidor, então não há segundo eixo aqui
+  // como há em ai_provider_credentials (0207).
+  "map_provider_credentials",
   // ⚠️ `webhook_lead_captures` (migration 0174) NÃO entra nesta lista, e a
   // ausência é deliberada: a policy dela exige `manager`, e o usuário semeado
   // aqui é `agent` — o controle positivo falharia por ACERTO, e a "correção"

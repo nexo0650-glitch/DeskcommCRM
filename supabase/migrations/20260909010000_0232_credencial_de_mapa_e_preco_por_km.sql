@@ -52,19 +52,19 @@ create policy tenant_isolation_map_provider_credentials_write on public.map_prov
     (organization_id in (select public.fn_user_org_ids())) and public.fn_role_at_least(organization_id, 'admin')
   );
 
-drop policy if exists support_write_map_credentials_insert on public.map_provider_credentials;
-create policy support_write_map_credentials_insert on public.map_provider_credentials
+drop policy if exists support_write_insert on public.map_provider_credentials;
+create policy support_write_insert on public.map_provider_credentials
   as restrictive for insert to authenticated
   with check (public.fn_support_write_allowed(organization_id));
 
-drop policy if exists support_write_map_credentials_update on public.map_provider_credentials;
-create policy support_write_map_credentials_update on public.map_provider_credentials
+drop policy if exists support_write_update on public.map_provider_credentials;
+create policy support_write_update on public.map_provider_credentials
   as restrictive for update to authenticated
   using (public.fn_support_write_allowed(organization_id))
   with check (public.fn_support_write_allowed(organization_id));
 
-drop policy if exists support_write_map_credentials_delete on public.map_provider_credentials;
-create policy support_write_map_credentials_delete on public.map_provider_credentials
+drop policy if exists support_write_delete on public.map_provider_credentials;
+create policy support_write_delete on public.map_provider_credentials
   as restrictive for delete to authenticated
   using (public.fn_support_write_allowed(organization_id));
 
