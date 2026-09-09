@@ -315,6 +315,21 @@ export const NAV_CATALOG = [
     minRole: "manager",
   },
   {
+    // Infra pro cálculo de distância de remoção (endereço origem → destino).
+    // Peça isolada de propósito: o cálculo em si (tool_call do agente) é
+    // trabalho separado, ainda não construído — sem essa chave, ele nem
+    // teria como existir. Fica junto de Credenciais (mesma seção, mesmo
+    // papel mínimo) porque é o mesmo tipo de decisão: "com qual conta
+    // externa este recurso trabalha".
+    href: "/app/ai/maps-credentials",
+    label: "Chave de mapa",
+    description: "A chave da OpenRouteService que o cálculo de distância de remoção usa.",
+    icon: "MapPin",
+    group: "ia",
+    section: "Montar o agente",
+    minRole: "manager",
+  },
+  {
     // O sistema chama modelo em 23 lugares e, até esta tela, a escolha vivia
     // espalhada por três pilhas de código e sete variáveis de ambiente — não
     // havia onde responder "quem usa IA aqui, e com qual chave?".
