@@ -25,6 +25,17 @@
  * produto passa a recusar todos os outros. "Ou o teto sobe, ou o catálogo
  * encolhe" — aqui o catálogo encolheu, porque listar e calcular são o mesmo
  * domínio e cabem numa tool com um modo opcional.
+ *
+ * ⚠️ TODA COTAÇÃO COMPLETA VIRA PROTOCOLO. Não é o agente que "lembra" de
+ * criar um lead depois — a criação está DENTRO do sucesso do cálculo
+ * (`criarOuReusarProtocolo`), então não tem como existir cotação completa
+ * sem protocolo nem protocolo de cotação incompleta: a garantia é mecânica,
+ * não depende do modelo escolher chamar outra tool. Números sequenciais por
+ * org via `crm_leads.protocol_number` (migration 0235). Reaproveita o
+ * protocolo se a MESMA combinação (contato, serviço, origem, destino) já foi
+ * calculada nas últimas 24h — evita que o agente recalculando opções ("e se
+ * for ida e volta?") abra um protocolo por tentativa; um pedido genuinamente
+ * novo (endereço diferente, ou o mesmo depois de 24h) sempre ganha um novo.
  */
 import { z } from "zod";
 
@@ -33,6 +44,7 @@ import { formatCents } from "@/lib/money";
 import { MapCredentialUnavailableError, loadActiveMapCredential } from "@/lib/maps/credenciais/carregar";
 import { geocodeAddress, type Coordenada } from "@/lib/maps/validators";
 import { calcularDistanciaMultiTrecho } from "@/lib/maps/rota";
+import { createLeadHandler } from "@/app/api/v1/leads/_handler";
 
 const TIPOS_DE_VIAGEM = ["ida", "ida_e_volta"] as const;
 
@@ -82,6 +94,14 @@ const inputShape = {
         "'ida_e_volta' se o veículo também traz o paciente de volta ao endereço de origem antes de " +
         "voltar pra Base. Pergunte ao cliente qual é o caso — nunca assuma.",
     ),
+  contact_id: z
+    .string()
+    .uuid()
+    .optional()
+    .describe(
+      "O id do contato desta conversa (vem do contexto que você já tem, nunca peça ao cliente). " +
+        "Obrigatório pra calcular — sem ele o orçamento não pode virar protocolo rastreável.",
+    ),
 };
 
 /** Monta a sequência de trechos na ordem que o veículo realmente percorre. */
@@ -126,33 +146,157 @@ async function listarServicos(ctx: McpContext): Promise<unknown> {
   };
 }
 
+interface DadosDoProtocolo {
+  contactId: string;
+  codigoServico: string;
+  nomeServico: string;
+  enderecoOrigem: string;
+  enderecoDestino: string;
+  tipoViagem: (typeof TIPOS_DE_VIAGEM)[number];
+  origemConfirmada: string;
+  destinoConfirmado: string;
+  distanciaKm: number;
+  modoDeCalculo: "por_km" | "valor_fixo";
+  precoTotalCents: number;
+  moeda: string;
+}
+
+/**
+ * Acha o pipeline padrão da org — não há pipeline dedicado de remoção ainda,
+ * então o protocolo entra no padrão, na primeira etapa (posição mais baixa).
+ * Sem pipeline/stage configurado, devolve null e a chamada segue sem
+ * protocolo (nunca bloqueia o orçamento em si — o preço já foi calculado).
+ */
+async function acharDestinoPadrao(
+  ctx: McpContext,
+): Promise<{ pipelineId: string; stageId: string } | null> {
+  const { data: pipeline } = await ctx.supabase
+    .from("crm_pipelines")
+    .select("id")
+    .eq("organization_id", ctx.organizationId)
+    .eq("is_default", true)
+    .eq("is_archived", false)
+    .maybeSingle<{ id: string }>();
+  if (!pipeline) return null;
+
+  const { data: stage } = await ctx.supabase
+    .from("crm_stages")
+    .select("id")
+    .eq("organization_id", ctx.organizationId)
+    .eq("pipeline_id", pipeline.id)
+    .order("position", { ascending: true })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (!stage) return null;
+
+  return { pipelineId: pipeline.id, stageId: stage.id };
+}
+
+/**
+ * Cria o lead/protocolo, ou reaproveita um se a MESMA combinação (contato,
+ * serviço, origem, destino) já virou protocolo nas últimas 24h — ver
+ * cabeçalho do arquivo. Nunca lança: falha em criar protocolo não pode
+ * derrubar um orçamento que já foi calculado corretamente.
+ */
+async function criarOuReusarProtocolo(
+  ctx: McpContext,
+  dados: DadosDoProtocolo,
+): Promise<number | null> {
+  try {
+    const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: existente } = await ctx.supabase
+      .from("crm_leads")
+      .select("protocol_number")
+      .eq("organization_id", ctx.organizationId)
+      .eq("contact_id", dados.contactId)
+      .eq("status", "open")
+      .eq("source_metadata->>codigo_servico", dados.codigoServico)
+      .eq("source_metadata->>endereco_origem", dados.enderecoOrigem)
+      .eq("source_metadata->>endereco_destino", dados.enderecoDestino)
+      .gte("created_at", desde)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ protocol_number: number | null }>();
+    if (existente?.protocol_number != null) return existente.protocol_number;
+
+    const destino = await acharDestinoPadrao(ctx);
+    if (!destino) return null;
+
+    const lead = (await createLeadHandler(
+      ctx.supabase,
+      { organization_id: ctx.organizationId, actor: ctx.actor, requestId: ctx.requestId },
+      {
+        pipeline_id: destino.pipelineId,
+        stage_id: destino.stageId,
+        title: `${dados.nomeServico} — protocolo pendente`,
+        description:
+          `Origem: ${dados.origemConfirmada}\n` +
+          `Destino: ${dados.destinoConfirmado}\n` +
+          `Tipo de viagem: ${dados.tipoViagem === "ida_e_volta" ? "ida e volta" : "ida"}\n` +
+          `Distância: ${dados.distanciaKm} km (${dados.modoDeCalculo === "por_km" ? "cobrado por km" : "valor fixo"})\n` +
+          `Orçamento: ${formatCents(dados.precoTotalCents, dados.moeda)}`,
+        contact_id: dados.contactId,
+        value_cents: dados.precoTotalCents,
+        currency: dados.moeda,
+        tags: ["remocao", dados.codigoServico],
+        source: "ai_agent",
+        source_metadata: {
+          codigo_servico: dados.codigoServico,
+          endereco_origem: dados.enderecoOrigem,
+          endereco_destino: dados.enderecoDestino,
+          tipo_viagem: dados.tipoViagem,
+        },
+      },
+    )) as { id: string; protocol_number: number | null };
+
+    if (lead.protocol_number == null) return null;
+
+    // Segunda ida só pro título, agora que o número existe — o trigger que
+    // atribui protocol_number roda no INSERT, então não dá pra sabê-lo antes.
+    await ctx.supabase
+      .from("crm_leads")
+      .update({ title: `${dados.nomeServico} — Protocolo #${lead.protocol_number}` })
+      .eq("id", lead.id)
+      .eq("organization_id", ctx.organizationId);
+
+    return lead.protocol_number;
+  } catch {
+    // Protocolo é rastreabilidade, não é o orçamento em si — uma falha aqui
+    // não pode fazer o agente dizer "não consegui calcular" quando conseguiu.
+    return null;
+  }
+}
+
 export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
   name: "crm_calculate_removal_quote",
   description:
-    "Lista modalidades de remoção OU calcula o ORÇAMENTO EXATO de uma. Chame SEM `codigo_servico` primeiro " +
-    "pra ver as modalidades cadastradas (Simples, SIV, UTI...) e seus códigos — nunca invente um código. " +
-    "Com `codigo_servico` + `endereco_origem` + `endereco_destino` + `tipo_viagem`, geocodifica a Base da " +
-    "empresa e os dois endereços, calcula a distância rodoviária de verdade do trajeto completo (Base até " +
-    "o paciente, do paciente ao destino, e a volta) e aplica a regra de preço da modalidade — valor fixo " +
-    "de ida/ida-e-volta abaixo do limiar de km cadastrado, ou valor por km a partir dele, mais a taxa de " +
-    "saída. Use SEMPRE que o cliente pedir preço de remoção — nunca estime distância ou valor de cabeça, " +
-    "preço errado é promessa que a empresa terá de cumprir ou desfazer. Pergunte ao cliente se é só ida ou " +
-    "ida e volta antes de calcular. Se voltar um erro, explique ao cliente o que falta ou peça para um " +
-    "humano ajudar — não responda um preço quando esta ferramenta não confirmou um.",
+    "Lista modalidades de remoção OU calcula o ORÇAMENTO EXATO de uma e ABRE O PROTOCOLO. Chame SEM " +
+    "`codigo_servico` primeiro pra ver as modalidades cadastradas (Simples, SIV, UTI...) e seus códigos — " +
+    "nunca invente um código. Com `codigo_servico` + `endereco_origem` + `endereco_destino` + `tipo_viagem` " +
+    "+ `contact_id`, geocodifica a Base da empresa e os dois endereços, calcula a distância rodoviária de " +
+    "verdade do trajeto completo (Base até o paciente, do paciente ao destino, e a volta) e aplica a regra " +
+    "de preço da modalidade — valor fixo de ida/ida-e-volta abaixo do limiar de km cadastrado, ou valor por " +
+    "km a partir dele, mais a taxa de saída. Todo cálculo bem-sucedido vira um protocolo numerado automático " +
+    "— não é preciso (nem existe outra ferramenta pra) criar um separadamente; um pedido novo do mesmo " +
+    "contato (outro paciente, ou o mesmo dia seguinte) ganha protocolo próprio. Use SEMPRE que o cliente " +
+    "pedir preço de remoção — nunca estime distância ou valor de cabeça, preço errado é promessa que a " +
+    "empresa terá de cumprir ou desfazer. Pergunte ao cliente se é só ida ou ida e volta antes de calcular. " +
+    "Se voltar um erro, explique ao cliente o que falta ou peça para um humano ajudar — não responda um " +
+    "preço quando esta ferramenta não confirmou um.",
   inputSchema: inputShape,
-  category: "read",
+  category: "write",
   requiresRole: "agent",
-  requiresScope: "mcp:read",
+  requiresScope: "mcp:write",
   handler: async (input, ctx) => {
     if (!input.codigo_servico) {
       return listarServicos(ctx);
     }
-    if (!input.endereco_origem || !input.endereco_destino || !input.tipo_viagem) {
+    if (!input.endereco_origem || !input.endereco_destino || !input.tipo_viagem || !input.contact_id) {
       return {
         erro: "parametros_insuficientes",
         mensagem:
-          "pra calcular o orçamento preciso também de endereco_origem, endereco_destino e tipo_viagem " +
-          "('ida' ou 'ida_e_volta').",
+          "pra calcular o orçamento preciso também de endereco_origem, endereco_destino, tipo_viagem " +
+          "('ida' ou 'ida_e_volta') e contact_id.",
       };
     }
 
@@ -247,6 +391,22 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
     const valorFixoCents = input.tipo_viagem === "ida_e_volta" ? servico.valor_ida_e_volta_cents : servico.valor_ida_cents;
     const componenteCents = porKm ? Math.round(rota.distanciaKm * servico.valor_km_cents) : valorFixoCents;
     const precoTotalCents = servico.taxa_saida_cents + componenteCents;
+    const modoDeCalculo = porKm ? "por_km" : "valor_fixo";
+
+    const protocolo = await criarOuReusarProtocolo(ctx, {
+      contactId: input.contact_id,
+      codigoServico: servico.codigo,
+      nomeServico: servico.nome,
+      enderecoOrigem: input.endereco_origem,
+      enderecoDestino: input.endereco_destino,
+      tipoViagem: input.tipo_viagem,
+      origemConfirmada: origem.rotulo,
+      destinoConfirmado: destino.rotulo,
+      distanciaKm,
+      modoDeCalculo,
+      precoTotalCents,
+      moeda: servico.moeda,
+    });
 
     return {
       modalidade: servico.nome,
@@ -256,7 +416,7 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
       origem_confirmada: origem.rotulo,
       destino_confirmado: destino.rotulo,
       distancia_km: distanciaKm,
-      modo_de_calculo: porKm ? "por_km" : "valor_fixo",
+      modo_de_calculo: modoDeCalculo,
       taxa_saida: formatCents(servico.taxa_saida_cents, servico.moeda),
       ...(porKm
         ? { valor_por_km: formatCents(servico.valor_km_cents, servico.moeda) }
@@ -266,11 +426,15 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
           }),
       preco_total: formatCents(precoTotalCents, servico.moeda),
       preco_total_cents: precoTotalCents,
+      ...(protocolo != null
+        ? { protocolo_numero: protocolo }
+        : { aviso_protocolo: "o orçamento foi calculado, mas não consegui registrar o protocolo — avise um humano." }),
       mensagem:
         "A distância já inclui o trajeto do veículo (Base até o paciente" +
         (input.tipo_viagem === "ida_e_volta" ? ", ida e volta do paciente" : "") +
-        " e o retorno à Base). Confirme os endereços encontrados com o cliente antes de fechar — se algum " +
-        "não bater com o que ele pediu, peça o endereço de novo.",
+        " e o retorno à Base). Confirme os endereços encontrados com o cliente antes de fechar" +
+        (protocolo != null ? ` e informe o protocolo (#${protocolo})` : "") +
+        " — se algum endereço não bater com o que ele pediu, peça de novo.",
     };
   },
 };

@@ -251,6 +251,7 @@ aplica.
 | `20260909010000` | `0232_credencial_de_mapa_e_preco_por_km` | Formaliza `map_provider_credentials` (aplicada direto em produção numa sessão anterior, sem migration — dívida registrada e paga aqui: tabela, view segura, RLS, revoke de `anon`, triggers de touch/audit) e adiciona `catalog_products.price_per_km_cents` (nullable, DIRC: mesmo conceito de `preco_cents`, só que por distância) para o cálculo de orçamento de remoção — preço fixo da modalidade + valor por km rodado. |
 | `20260909020000` | `0233_endereco_da_base` | `organizations.base_address` (nullable) — endereço de despacho do veículo, usado pelo cálculo de orçamento de remoção pra somar o trecho Base→origem (e volta, em viagem de ida e volta). |
 | `20260909030000` | `0234_servicos_de_remocao` | Tabela `remocao_servicos` própria (não mais em `catalog_products`): preço fixo por ida/ida-e-volta + taxa de saída única, ou preço por km acima de um limiar configurável por serviço. RLS + cerca de suporte com os nomes genéricos `support_write_insert/update/delete`. |
+| `20260909040000` | `0235_protocolo_de_remocao` | `crm_leads.protocol_number` (sequencial por org, atribuído por trigger em `organizations.next_lead_protocol_number`) — genérico de CRM, usado hoje pelo cálculo de orçamento de remoção pra criar um lead/protocolo novo a cada cotação completa, sem misturar pedidos do mesmo contato. |
 
 ## Reproducibility
 

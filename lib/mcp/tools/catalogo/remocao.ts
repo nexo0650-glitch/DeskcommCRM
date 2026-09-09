@@ -11,12 +11,12 @@ import { declararTools } from "./tipos";
 export const TOOLS_REMOCAO = declararTools([
   {
     name: "crm_calculate_removal_quote",
-    category: "read",
-    rotulo: "Calcular orçamento de remoção",
+    category: "write",
+    rotulo: "Calcular orçamento de remoção e abrir protocolo",
     explicacao:
-      "Mostra as modalidades de remoção cadastradas (Simples, SIV, UTI...) e calcula o preço exato de uma a partir do endereço de origem e destino e do trajeto completo do veículo, aplicando o valor fixo ou o valor por km conforme a distância — para o assistente nunca chutar distância nem preço.",
-    oQueToca: "Orçamento de remoção",
-    risco: "seguro",
+      "Mostra as modalidades de remoção cadastradas (Simples, SIV, UTI...), calcula o preço exato de uma a partir do endereço de origem e destino, e registra um protocolo numerado no funil — para o assistente nunca chutar distância nem preço, e todo pedido ficar rastreável.",
+    oQueToca: "Orçamento e protocolo de remoção",
+    risco: "atencao",
     pacotes: ["vender"],
   },
 ]);

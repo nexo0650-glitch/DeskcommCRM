@@ -110,7 +110,6 @@ export const allTools: ReadonlyArray<McpToolDefinition> = [
   crmSaveOrgMemory,
   crmListContactOrders,
   crmSearchProducts,
-  crmCalculateRemovalQuote,
   crmListPrivacyRequests,
   // read — organizar a operação (W4)
   crmListStages,
@@ -139,6 +138,7 @@ export const allTools: ReadonlyArray<McpToolDefinition> = [
   crmSendWhatsappMessage,
   crmAssignConversation,
   crmManageTags,
+  crmCalculateRemovalQuote,
   // write — organizar a operação (W4)
   crmCreateStage,
   crmUpdateStage,
