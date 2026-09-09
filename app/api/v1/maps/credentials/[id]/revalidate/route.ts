@@ -10,6 +10,7 @@ import { type NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { byteaToBuffer, decryptKey } from "@/lib/crypto/aes_gcm";
 import { validateMapProviderKey, type MapProvider } from "@/lib/maps/validators";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -23,6 +24,9 @@ export async function POST(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+  const supportDenied = await requireSupportWrite();
+  if (supportDenied) return supportDenied;
+
   const requestId = randomUUID();
   const { id } = await ctx.params;
 

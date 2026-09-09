@@ -9,18 +9,13 @@ import { useT } from "@/hooks/i18n/useT";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api/client";
 import { precoParaCentavos, type Produto } from "@/lib/schemas/produtos";
+import { formatCents } from "@/lib/money";
 
 interface Textos {
   titulo: string;
   subtitulo: string;
   vazio: string;
   vazioDica: string;
-}
-
-/** O preço como quem vende lê. */
-function comoMoeda(cents: number, moeda: string): string {
-  const v = (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-  return moeda === "BRL" ? `R$ ${v}` : `${moeda} ${v}`;
 }
 
 /** Centavos -> texto editável ("5499,00"), pro formulário reabrir já preenchido. */
@@ -505,10 +500,10 @@ export function ProdutosClient({
                 </p>
               </div>
               <span className="shrink-0 tabular-nums font-medium">
-                {comoMoeda(p.preco_cents, p.moeda)}
+                {formatCents(p.preco_cents, p.moeda)}
                 {p.price_per_km_cents != null ? (
                   <span className="ml-1 text-xs font-normal text-muted-foreground">
-                    {t("+")} {comoMoeda(p.price_per_km_cents, p.moeda)}/km
+                    {t("+")} {formatCents(p.price_per_km_cents, p.moeda)} {t("por km")}
                   </span>
                 ) : null}
               </span>
