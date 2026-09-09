@@ -1,20 +1,20 @@
 /**
- * Capacidade de REMOÇÃO — orçamento de transporte (ambulância) por distância.
+ * Capacidade de REMOÇÃO — modalidades e orçamento de transporte (ambulância).
  *
- * Vertical específica desta instalação, não do produto genérico: preço =
- * `catalog_products.preco_cents` (fixo da modalidade) + km rodado ×
- * `catalog_products.price_per_km_cents` (migration 0232). O km rodado NÃO é
- * só origem→destino: o veículo sai da Base (`organizations.base_address`,
- * migration 0233), então o trecho Base→origem sempre entra na conta — e,
- * numa remoção de ida e volta, o trecho de volta (destino→origem) e o
- * retorno à Base (origem→Base) entram também.
+ * Vertical específica desta instalação: catálogo próprio (`remocao_servicos`,
+ * migration 0234), separado do produto genérico. Preço:
  *
- * Nunca deixa o modelo estimar distância ou preço: geocodifica os endereços
- * e calcula a rota de verdade, num único pedido de rota multi-trecho, contra
- * a OpenRouteService. Se qualquer passo falhar (sem credencial, sem base
- * cadastrada, endereço não encontrado, rota impossível), devolve um erro
- * estruturado — a mesma doutrina de `crm_search_products`, que prefere "não
- * sei" a um número inventado.
+ *   - distância do trajeto < limiar_km  → taxa_saida + (valor_ida OU valor_ida_e_volta)
+ *   - distância do trajeto >= limiar_km → taxa_saida + (distância × valor_km)
+ *
+ * O trajeto em si (Base→origem→destino→..., ver `trajetoDaViagem`) é sempre
+ * calculado de verdade contra a OpenRouteService — é o que decide qual dos
+ * dois ramos da fórmula vale, então nunca pode ser estimado.
+ *
+ * Nunca deixa o modelo estimar distância ou preço: se qualquer passo falhar
+ * (sem credencial, sem base cadastrada, endereço não encontrado, rota
+ * impossível), devolve um erro estruturado — a mesma doutrina de
+ * `crm_search_products`, que prefere "não sei" a um número inventado.
  */
 import { z } from "zod";
 
@@ -25,6 +25,71 @@ import { geocodeAddress, type Coordenada } from "@/lib/maps/validators";
 import { calcularDistanciaMultiTrecho } from "@/lib/maps/rota";
 
 const TIPOS_DE_VIAGEM = ["ida", "ida_e_volta"] as const;
+
+interface ServicoRemocao {
+  codigo: string;
+  nome: string;
+  valor_ida_cents: number;
+  valor_ida_e_volta_cents: number;
+  taxa_saida_cents: number;
+  valor_km_cents: number;
+  limiar_km: number;
+  moeda: string;
+  ativo: boolean;
+}
+
+const SELECT_SERVICO =
+  "codigo, nome, valor_ida_cents, valor_ida_e_volta_cents, taxa_saida_cents, valor_km_cents, limiar_km, moeda, ativo";
+
+// ---------------------------------------------------------------------------
+// listar modalidades
+// ---------------------------------------------------------------------------
+
+const listServicosInputShape = {};
+
+export const crmListRemovalServices: McpToolDefinition<typeof listServicosInputShape> = {
+  name: "crm_list_removal_services",
+  description:
+    "Lista as modalidades de remoção cadastradas (ex.: Simples, SIV, UTI), com o código de cada uma. Use " +
+    "ANTES de crm_calculate_removal_quote pra saber qual código passar — nunca invente um código de " +
+    "modalidade.",
+  inputSchema: listServicosInputShape,
+  category: "read",
+  requiresRole: "agent",
+  requiresScope: "mcp:read",
+  handler: async (_input, ctx) => {
+    const { data, error } = await ctx.supabase
+      .from("remocao_servicos")
+      .select(SELECT_SERVICO)
+      .eq("organization_id", ctx.organizationId)
+      .eq("ativo", true)
+      .order("nome")
+      .limit(50);
+
+    if (error) throw new Error(`listar_servicos_de_remocao_falhou: ${error.message}`);
+    const servicos = (data ?? []) as unknown as ServicoRemocao[];
+
+    if (servicos.length === 0) {
+      return {
+        servicos: [],
+        mensagem: "não há nenhuma modalidade de remoção cadastrada — peça a um humano para confirmar o orçamento.",
+      };
+    }
+
+    return {
+      servicos: servicos.map((s) => ({
+        codigo: s.codigo,
+        nome: s.nome,
+        valor_ida: formatCents(s.valor_ida_cents, s.moeda),
+        valor_ida_e_volta: formatCents(s.valor_ida_e_volta_cents, s.moeda),
+      })),
+    };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// calcular orçamento
+// ---------------------------------------------------------------------------
 
 const inputShape = {
   endereco_origem: z
@@ -37,13 +102,13 @@ const inputShape = {
     .trim()
     .min(5)
     .describe("Endereço completo de destino da remoção (rua, número, bairro, cidade)."),
-  codigo_produto: z
+  codigo_servico: z
     .string()
     .trim()
     .min(1)
     .describe(
-      "O código da modalidade de remoção, como veio de crm_search_products (ex.: REMOCAO-SIMPLES). " +
-        "Sempre busque o código com crm_search_products antes — nunca invente um código.",
+      "O código da modalidade de remoção, como veio de crm_list_removal_services (ex.: REMOCAO-SIMPLES). " +
+        "Sempre busque o código com crm_list_removal_services antes — nunca invente um código.",
     ),
   tipo_viagem: z
     .enum(TIPOS_DE_VIAGEM)
@@ -53,15 +118,6 @@ const inputShape = {
         "voltar pra Base. Pergunte ao cliente qual é o caso — nunca assuma.",
     ),
 };
-
-interface ProdutoRemocao {
-  codigo: string;
-  nome: string;
-  preco_cents: number;
-  moeda: string;
-  price_per_km_cents: number | null;
-  ativo: boolean;
-}
 
 /** Monta a sequência de trechos na ordem que o veículo realmente percorre. */
 function trajetoDaViagem(
@@ -80,11 +136,12 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
   description:
     "Calcula o ORÇAMENTO EXATO de uma remoção: geocodifica a Base da empresa e os endereços de origem e " +
     "destino, calcula a distância rodoviária de verdade do trajeto completo (Base até o paciente, do " +
-    "paciente ao destino, e a volta) e soma o preço fixo da modalidade com o valor por km cadastrado. " +
+    "paciente ao destino, e a volta) e aplica a regra de preço da modalidade — valor fixo de ida/ida-e-volta " +
+    "abaixo do limiar de km cadastrado, ou valor por km a partir dele, mais a taxa de saída. " +
     "Use SEMPRE que o cliente pedir preço de remoção com endereço de origem e destino — nunca estime " +
     "distância ou valor de cabeça, preço errado é promessa que a empresa terá de cumprir ou desfazer. " +
-    "Busque o código da modalidade com crm_search_products ANTES de chamar esta ferramenta, e pergunte " +
-    "ao cliente se é só ida ou ida e volta. " +
+    "Busque o código da modalidade com crm_list_removal_services ANTES de chamar esta ferramenta, e " +
+    "pergunte ao cliente se é só ida ou ida e volta. " +
     "Se voltar um erro, explique ao cliente o que falta (endereço mais completo, por exemplo) ou peça para " +
     "um humano ajudar — não responda um preço quando esta ferramenta não confirmou um.",
   inputSchema: inputShape,
@@ -92,25 +149,19 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
   requiresRole: "agent",
   requiresScope: "mcp:read",
   handler: async (input, ctx) => {
-    const { data: produto, error: erroProduto } = await ctx.supabase
-      .from("catalog_products")
-      .select("codigo, nome, preco_cents, moeda, price_per_km_cents, ativo")
+    const { data: servico, error: erroServico } = await ctx.supabase
+      .from("remocao_servicos")
+      .select(SELECT_SERVICO)
       .eq("organization_id", ctx.organizationId)
-      .eq("codigo", input.codigo_produto)
+      .eq("codigo", input.codigo_servico)
       .eq("ativo", true)
-      .maybeSingle<ProdutoRemocao>();
+      .maybeSingle<ServicoRemocao>();
 
-    if (erroProduto) throw new Error(`buscar_produto_falhou: ${erroProduto.message}`);
-    if (!produto) {
+    if (erroServico) throw new Error(`buscar_servico_de_remocao_falhou: ${erroServico.message}`);
+    if (!servico) {
       return {
-        erro: "produto_nao_encontrado",
-        mensagem: `não há modalidade ativa com o código "${input.codigo_produto}". Busque de novo com crm_search_products.`,
-      };
-    }
-    if (produto.price_per_km_cents == null) {
-      return {
-        erro: "produto_sem_preco_por_km",
-        mensagem: `"${produto.nome}" não está cadastrado como modalidade cobrada por distância — peça a um humano para confirmar o preço.`,
+        erro: "servico_nao_encontrado",
+        mensagem: `não há modalidade ativa com o código "${input.codigo_servico}". Busque de novo com crm_list_removal_services.`,
       };
     }
 
@@ -185,21 +236,29 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
     }
 
     const distanciaKm = Math.round(rota.distanciaKm * 10) / 10;
-    const precoDistanciaCents = Math.round(rota.distanciaKm * produto.price_per_km_cents);
-    const precoTotalCents = produto.preco_cents + precoDistanciaCents;
+    const porKm = rota.distanciaKm >= servico.limiar_km;
+    const valorFixoCents = input.tipo_viagem === "ida_e_volta" ? servico.valor_ida_e_volta_cents : servico.valor_ida_cents;
+    const componenteCents = porKm ? Math.round(rota.distanciaKm * servico.valor_km_cents) : valorFixoCents;
+    const precoTotalCents = servico.taxa_saida_cents + componenteCents;
 
     return {
-      modalidade: produto.nome,
-      codigo_produto: produto.codigo,
+      modalidade: servico.nome,
+      codigo_servico: servico.codigo,
       tipo_viagem: input.tipo_viagem,
       base_confirmada: base.rotulo,
       origem_confirmada: origem.rotulo,
       destino_confirmado: destino.rotulo,
       distancia_km: distanciaKm,
-      preco_base: formatCents(produto.preco_cents, produto.moeda),
-      preco_por_km: formatCents(produto.price_per_km_cents, produto.moeda),
-      preco_distancia: formatCents(precoDistanciaCents, produto.moeda),
-      preco_total: formatCents(precoTotalCents, produto.moeda),
+      modo_de_calculo: porKm ? "por_km" : "valor_fixo",
+      taxa_saida: formatCents(servico.taxa_saida_cents, servico.moeda),
+      ...(porKm
+        ? { valor_por_km: formatCents(servico.valor_km_cents, servico.moeda) }
+        : {
+            valor_fixo_usado:
+              input.tipo_viagem === "ida_e_volta" ? "ida e volta" : "ida",
+            valor_fixo: formatCents(valorFixoCents, servico.moeda),
+          }),
+      preco_total: formatCents(precoTotalCents, servico.moeda),
       preco_total_cents: precoTotalCents,
       mensagem:
         "A distância já inclui o trajeto do veículo (Base até o paciente" +

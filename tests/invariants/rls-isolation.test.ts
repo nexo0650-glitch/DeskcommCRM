@@ -221,6 +221,13 @@ beforeAll(() => {
             values (v_org, 'RLS-' || v_org::text, 'Produto de invariante', 100);
         end if;
 
+        -- migration 0234 — modalidades de remoção, catálogo próprio.
+        if not exists (select 1 from public.remocao_servicos where organization_id = v_org) then
+          insert into public.remocao_servicos
+            (organization_id, codigo, nome, valor_ida_cents, valor_ida_e_volta_cents, valor_km_cents, limiar_km)
+            values (v_org, 'RLS-REMOCAO-' || v_org::text, 'Remoção de invariante', 100, 180, 10, 50);
+        end if;
+
         -- crm_tasks (migration 0210): o que o time combinou fazer, com prazo.
         -- Entra COM o vínculo de lead porque a tarefa presa a um negócio é o
         -- caso que cruza duas tabelas tenant-aware — se a policy vazasse, o
@@ -295,6 +302,10 @@ export const TABLES = [
   // exige `manager` — esse segundo eixo é medido em
   // `tests/invariants/catalogo-so-gestor-muda-preco.test.ts`, não aqui.
   "catalog_products",
+  // migration 0234 — modalidades de remoção. Leitura org-scoped sem gate de
+  // papel (mesma forma de catalog_products); a escrita exige manager, medida
+  // pela mesma rota que valida catalog_products.
+  "remocao_servicos",
   // migration 0210 — as tarefas do CRM. A leitura é org-scoped sem gate de papel
   // (o `viewer` precisa ver o que o time combinou); a ESCRITA exige `agent`, e
   // esse segundo eixo NÃO é medido aqui — o usuário semeado é `agent`, então o

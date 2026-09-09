@@ -453,6 +453,11 @@ export const AUDIT_ACTIONS = [
   "catalog_product.deleted",
   "catalog_product.imported",
 
+  // Modalidades de remoção — preço fixo/km com limiar (migration 0234).
+  "removal_service.created",
+  "removal_service.updated",
+  "removal_service.deleted",
+
   // As tarefas do CRM (migration 0210). Tarefa é combinado de trabalho entre
   // pessoas do time — quem a criou, quem mudou o prazo e quem a apagou é
   // exatamente o que se disputa depois de um cliente ficar sem retorno.

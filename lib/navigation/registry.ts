@@ -2,6 +2,7 @@ import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
 import { type Role } from "@/lib/auth/types";
 import {
+  Ambulance,
   Bell,
   BookOpen,
   Brain,
@@ -52,6 +53,7 @@ import { destinosDaInterface, type InterfaceSettings } from "./interface";
 export { NAV_GROUPS, GRUPO_NO_RODAPE } from "./catalogo";
 export type { NavGroup, NavGroupId } from "./catalogo";
 const ICONS = {
+  Ambulance,
   Bell,
   BookOpen,
   Brain,

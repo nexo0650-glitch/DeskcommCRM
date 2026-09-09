@@ -224,6 +224,19 @@ export const NAV_CATALOG = [
     // Inbox e o funil, que continuam no menu.
   },
   {
+    // Vertical desta instalação (transporte/ambulância), não do produto
+    // genérico — por isso mora ao lado de Produtos, mas é tabela e tela
+    // próprias (migration 0234). Mesmo raciocínio do comentário acima: quem
+    // responde o preço ao cliente é o agente de IA (`crm_calculate_removal_quote`);
+    // esta tela é onde a modalidade se cadastra.
+    href: "/app/removal-services",
+    label: "Serviços de remoção",
+    description: "As modalidades de remoção (Simples, SIV, UTI...) com o preço que o agente de IA usa pra calcular orçamento.",
+    icon: "Ambulance",
+    group: "crm",
+    section: "Preparar a venda",
+  },
+  {
     // A promessa que o comentário da Agenda fazia desde que ela nasceu. Aqui se
     // decide O QUE se pode marcar, quanto dura e quem atende — e é isto que a
     // tela de marcar e o agente de IA oferecem ao cliente.

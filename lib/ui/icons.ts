@@ -137,4 +137,5 @@ export {
   GoogleLogo,
   MapPin,
   ArrowsOutSimple,
+  Ambulance,
 } from "@phosphor-icons/react/dist/ssr";
