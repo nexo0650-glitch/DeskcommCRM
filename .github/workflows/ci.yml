@@ -4,6 +4,11 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Fork-only: pushes não disparam Actions automaticamente até o dono clicar
+  # "I understand my workflows, go ahead and enable them" na aba Actions (só
+  # UI, sem endpoint de API equivalente). workflow_dispatch contorna isso
+  # neste fork sem mexer no comportamento do repo upstream em nada.
+  workflow_dispatch: {}
 
 # O GITHUB_TOKEN destes jobs serve a `actions/checkout` (clone) e a
 # `actions/setup-node` (manifest de `actions/node-versions`, repo público) —
