@@ -47,7 +47,6 @@ export const DICIONARIO: Traducoes = {
   "Editar serviço": { es: "Editar servicio" },
   "Copiar serviço": { es: "Copiar servicio" },
   "Detalhes do serviço": { es: "Detalles del servicio" },
-  "Descrição": { es: "Descripción" },
   "Valor da ida": { es: "Valor de ida" },
   "Valor de ida e volta": { es: "Valor de ida y vuelta" },
   "Taxa de saída": { es: "Tarifa de salida" },
