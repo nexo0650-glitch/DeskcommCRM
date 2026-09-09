@@ -43,6 +43,7 @@ interface Rascunho {
   categoria: string;
   preco: string;
   custo: string;
+  precoPorKm: string;
   quantidade: string;
   controla_estoque: boolean;
 }
@@ -54,6 +55,7 @@ const VAZIO: Rascunho = {
   categoria: "",
   preco: "",
   custo: "",
+  precoPorKm: "",
   quantidade: "0",
   controla_estoque: true,
 };
@@ -66,6 +68,10 @@ function doRascunho(
   if (preco_cents === null) return { erro: t("Preço inválido. Escreva assim: 5.499,00") };
   const custo_cents = r.custo.trim() === "" ? null : precoParaCentavos(r.custo);
   if (r.custo.trim() !== "" && custo_cents === null) return { erro: t("Custo inválido.") };
+  const price_per_km_cents = r.precoPorKm.trim() === "" ? null : precoParaCentavos(r.precoPorKm);
+  if (r.precoPorKm.trim() !== "" && price_per_km_cents === null) {
+    return { erro: t("Preço por km inválido.") };
+  }
 
   return {
     codigo: r.codigo.trim(),
@@ -74,6 +80,7 @@ function doRascunho(
     ...(r.categoria.trim() ? { categoria: r.categoria.trim() } : {}),
     preco_cents,
     custo_cents,
+    price_per_km_cents,
     controla_estoque: r.controla_estoque,
     quantidade: Number(r.quantidade) || 0,
   };
@@ -87,6 +94,7 @@ function rascunhoDoProduto(p: Produto, codigoNovo?: string): Rascunho {
     categoria: p.categoria ?? "",
     preco: comoTextoEditavel(p.preco_cents),
     custo: p.custo_cents != null ? comoTextoEditavel(p.custo_cents) : "",
+    precoPorKm: p.price_per_km_cents != null ? comoTextoEditavel(p.price_per_km_cents) : "",
     quantidade: String(p.quantidade),
     controla_estoque: p.controla_estoque,
   };
@@ -416,6 +424,22 @@ export function ProdutosClient({
                 {t("Serve para o atendente saber até onde pode negociar. Não aparece para o cliente.")}
               </span>
             </label>
+            <label className="text-sm">
+              {t("Preço por km rodado")} <span className="text-muted-foreground">{t("(opcional)")}</span>
+              <input
+                value={rascunho.precoPorKm}
+                onChange={(e) => setRascunho({ ...rascunho, precoPorKm: e.target.value })}
+                placeholder="3,00"
+                className="mt-1 h-9 w-full rounded-md border px-3 disabled:bg-muted disabled:text-muted-foreground"
+                data-testid="produto-preco-por-km"
+                disabled={somenteLeitura}
+              />
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {t(
+                  "Some ao preço acima por km rodado entre origem e destino. Usado pelo cálculo de orçamento de remoção — deixe em branco se este produto não é cobrado por distância.",
+                )}
+              </span>
+            </label>
           </div>
 
           <label className="mt-3 flex items-center gap-2 text-sm">
@@ -482,6 +506,11 @@ export function ProdutosClient({
               </div>
               <span className="shrink-0 tabular-nums font-medium">
                 {comoMoeda(p.preco_cents, p.moeda)}
+                {p.price_per_km_cents != null ? (
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    {t("+")} {comoMoeda(p.price_per_km_cents, p.moeda)}/km
+                  </span>
+                ) : null}
               </span>
 
               <div className="flex shrink-0 items-center gap-1">

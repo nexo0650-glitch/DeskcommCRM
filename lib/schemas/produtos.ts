@@ -112,6 +112,10 @@ export const produtoCreateSchema = z.object({
   // do `produtoPatchSchema` (que é este `.partial()`), e isso é o certo: a
   // linha guarda a moeda com que nasceu.
   custo_cents: z.number().int().min(0).nullable().optional(),
+  // Nulo = produto sem componente de distância (a esmagadora maioria do
+  // catálogo). Usado hoje só pelo cálculo de orçamento de remoção
+  // (`crm_calculate_removal_quote`): preco_total = preco_cents + km * este.
+  price_per_km_cents: z.number().int().min(0, "preço por km não pode ser negativo").nullable().optional(),
   controla_estoque: z.boolean().default(true),
   quantidade: z.number().int().min(0).default(0),
   ativo: z.boolean().default(true),
@@ -134,6 +138,7 @@ export interface Produto {
   preco_cents: number;
   moeda: string;
   custo_cents: number | null;
+  price_per_km_cents: number | null;
   controla_estoque: boolean;
   quantidade: number;
   ativo: boolean;
@@ -144,5 +149,5 @@ export interface Produto {
 
 /** As colunas que a tela e a rota leem — uma lista, não duas. */
 export const COLUNAS_DO_PRODUTO =
-  "id, codigo, nome, descricao, marca, categoria, preco_cents, moeda, custo_cents, " +
+  "id, codigo, nome, descricao, marca, categoria, preco_cents, moeda, custo_cents, price_per_km_cents, " +
   "controla_estoque, quantidade, ativo, origem, imagem_url, updated_at";
