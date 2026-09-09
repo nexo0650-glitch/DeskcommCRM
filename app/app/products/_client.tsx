@@ -8,7 +8,6 @@ import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { useT } from "@/hooks/i18n/useT";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api/client";
-import { formatCents } from "@/lib/money";
 import { precoParaCentavos, type Produto } from "@/lib/schemas/produtos";
 
 interface Textos {
@@ -16,6 +15,17 @@ interface Textos {
   subtitulo: string;
   vazio: string;
   vazioDica: string;
+}
+
+/** O preço como quem vende lê. */
+function comoMoeda(cents: number, moeda: string): string {
+  const v = (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+  return moeda === "BRL" ? `R$ ${v}` : `${moeda} ${v}`;
+}
+
+/** Centavos -> texto editável ("5499,00"), pro formulário reabrir já preenchido. */
+function comoTextoEditavel(cents: number): string {
+  return (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 }
 
 interface ResumoDaImportacao {
@@ -69,6 +79,30 @@ function doRascunho(
   };
 }
 
+function rascunhoDoProduto(p: Produto, codigoNovo?: string): Rascunho {
+  return {
+    codigo: codigoNovo ?? p.codigo,
+    nome: p.nome,
+    marca: p.marca ?? "",
+    categoria: p.categoria ?? "",
+    preco: comoTextoEditavel(p.preco_cents),
+    custo: p.custo_cents != null ? comoTextoEditavel(p.custo_cents) : "",
+    quantidade: String(p.quantidade),
+    controla_estoque: p.controla_estoque,
+  };
+}
+
+/** Sugere um código livre pra cópia: acrescenta "-COPIA", "-COPIA-2", ... */
+function codigoDeCopia(codigoOriginal: string, existentes: Set<string>): string {
+  const base = `${codigoOriginal}-COPIA`;
+  if (!existentes.has(base)) return base;
+  let n = 2;
+  while (existentes.has(`${base}-${n}`)) n++;
+  return `${base}-${n}`;
+}
+
+type ModoFormulario = "criar" | "editar" | "copiar" | "ver";
+
 export function ProdutosClient({
   inicial,
   podeEditar,
@@ -81,9 +115,12 @@ export function ProdutosClient({
   const t = useT();
   const router = useRouter();
   const [busca, setBusca] = React.useState("");
-  const [criando, setCriando] = React.useState(false);
+  const [modo, setModo] = React.useState<ModoFormulario | null>(null);
+  const [editandoId, setEditandoId] = React.useState<string | null>(null);
   const [rascunho, setRascunho] = React.useState<Rascunho>(VAZIO);
   const [salvando, setSalvando] = React.useState(false);
+  const [excluindoId, setExcluindoId] = React.useState<string | null>(null);
+  const [confirmandoExclusao, setConfirmandoExclusao] = React.useState<Produto | null>(null);
   const [importando, setImportando] = React.useState(false);
   const [resumo, setResumo] = React.useState<ResumoDaImportacao | null>(null);
   const arquivoRef = React.useRef<HTMLInputElement>(null);
@@ -96,6 +133,38 @@ export function ProdutosClient({
     );
   }, [inicial, busca]);
 
+  const codigosExistentes = React.useMemo(() => new Set(inicial.map((p) => p.codigo)), [inicial]);
+
+  function abrirCriar() {
+    setModo("criar");
+    setEditandoId(null);
+    setRascunho(VAZIO);
+  }
+
+  function abrirVer(p: Produto) {
+    setModo("ver");
+    setEditandoId(p.id);
+    setRascunho(rascunhoDoProduto(p));
+  }
+
+  function abrirEditar(p: Produto) {
+    setModo("editar");
+    setEditandoId(p.id);
+    setRascunho(rascunhoDoProduto(p));
+  }
+
+  function abrirCopiar(p: Produto) {
+    setModo("copiar");
+    setEditandoId(null);
+    setRascunho(rascunhoDoProduto(p, codigoDeCopia(p.codigo, codigosExistentes)));
+  }
+
+  function fechar() {
+    setModo(null);
+    setEditandoId(null);
+    setRascunho(VAZIO);
+  }
+
   async function salvar() {
     const corpo = doRascunho(rascunho, t);
     if ("erro" in corpo) {
@@ -104,15 +173,33 @@ export function ProdutosClient({
     }
     setSalvando(true);
     try {
-      await apiClient.post("/api/v1/products", corpo);
-      toast.success(t("Produto cadastrado"));
-      setRascunho(VAZIO);
-      setCriando(false);
+      if (modo === "editar" && editandoId) {
+        await apiClient.patch(`/api/v1/products/${editandoId}`, corpo);
+        toast.success(t("Produto atualizado"));
+      } else {
+        await apiClient.post("/api/v1/products", corpo);
+        toast.success(t("Produto cadastrado"));
+      }
+      fechar();
       router.refresh();
     } catch (e) {
       showApiError(e);
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function excluir(p: Produto) {
+    setExcluindoId(p.id);
+    try {
+      await apiClient.delete(`/api/v1/products/${p.id}`);
+      toast.success(t("Produto excluído"));
+      setConfirmandoExclusao(null);
+      router.refresh();
+    } catch (e) {
+      showApiError(e);
+    } finally {
+      setExcluindoId(null);
     }
   }
 
@@ -153,6 +240,17 @@ export function ProdutosClient({
     }
   }
 
+  const formAberto = modo !== null;
+  const somenteLeitura = modo === "ver";
+  const tituloForm =
+    modo === "editar"
+      ? t("Editar produto")
+      : modo === "copiar"
+        ? t("Copiar produto")
+        : modo === "ver"
+          ? t("Detalhes do produto")
+          : t("Novo produto");
+
   return (
     <div className="mx-auto w-full max-w-5xl p-6" data-testid="tela-produtos">
       <header className="mb-6">
@@ -170,8 +268,8 @@ export function ProdutosClient({
         />
         {podeEditar ? (
           <>
-            <Button onClick={() => setCriando((v) => !v)} data-testid="novo-produto">
-              {t(criando ? "Cancelar" : "Novo produto")}
+            <Button onClick={() => (formAberto ? fechar() : abrirCriar())} data-testid="novo-produto">
+              {t(formAberto ? "Cancelar" : "Novo produto")}
             </Button>
             <input
               ref={arquivoRef}
@@ -244,16 +342,26 @@ export function ProdutosClient({
         </div>
       ) : null}
 
-      {criando && podeEditar ? (
+      {formAberto ? (
         <div className="mb-6 rounded-lg border p-4" data-testid="form-produto">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold">{tituloForm}</h2>
+            {modo === "ver" ? (
+              <button type="button" className="text-xs text-muted-foreground underline" onClick={fechar}>
+                {t("Fechar")}
+              </button>
+            ) : null}
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
               {t("Código")}
               <input
                 value={rascunho.codigo}
                 onChange={(e) => setRascunho({ ...rascunho, codigo: e.target.value })}
-                className="mt-1 h-9 w-full rounded-md border px-3"
+                className="mt-1 h-9 w-full rounded-md border px-3 disabled:bg-muted disabled:text-muted-foreground"
                 data-testid="produto-codigo"
+                disabled={somenteLeitura || modo === "editar"}
+                title={modo === "editar" ? t("O código não muda depois de criado.") : undefined}
               />
             </label>
             <label className="text-sm">
@@ -261,8 +369,9 @@ export function ProdutosClient({
               <input
                 value={rascunho.nome}
                 onChange={(e) => setRascunho({ ...rascunho, nome: e.target.value })}
-                className="mt-1 h-9 w-full rounded-md border px-3"
+                className="mt-1 h-9 w-full rounded-md border px-3 disabled:bg-muted disabled:text-muted-foreground"
                 data-testid="produto-nome"
+                disabled={somenteLeitura}
               />
             </label>
             <label className="text-sm">
@@ -270,7 +379,8 @@ export function ProdutosClient({
               <input
                 value={rascunho.marca}
                 onChange={(e) => setRascunho({ ...rascunho, marca: e.target.value })}
-                className="mt-1 h-9 w-full rounded-md border px-3"
+                className="mt-1 h-9 w-full rounded-md border px-3 disabled:bg-muted disabled:text-muted-foreground"
+                disabled={somenteLeitura}
               />
             </label>
             <label className="text-sm">
@@ -278,7 +388,8 @@ export function ProdutosClient({
               <input
                 value={rascunho.categoria}
                 onChange={(e) => setRascunho({ ...rascunho, categoria: e.target.value })}
-                className="mt-1 h-9 w-full rounded-md border px-3"
+                className="mt-1 h-9 w-full rounded-md border px-3 disabled:bg-muted disabled:text-muted-foreground"
+                disabled={somenteLeitura}
               />
             </label>
             <label className="text-sm">
@@ -287,8 +398,9 @@ export function ProdutosClient({
                 value={rascunho.preco}
                 onChange={(e) => setRascunho({ ...rascunho, preco: e.target.value })}
                 placeholder="5.499,00"
-                className="mt-1 h-9 w-full rounded-md border px-3"
+                className="mt-1 h-9 w-full rounded-md border px-3 disabled:bg-muted disabled:text-muted-foreground"
                 data-testid="produto-preco"
+                disabled={somenteLeitura}
               />
             </label>
             <label className="text-sm">
@@ -297,7 +409,8 @@ export function ProdutosClient({
                 value={rascunho.custo}
                 onChange={(e) => setRascunho({ ...rascunho, custo: e.target.value })}
                 placeholder="4.100,00"
-                className="mt-1 h-9 w-full rounded-md border px-3"
+                className="mt-1 h-9 w-full rounded-md border px-3 disabled:bg-muted disabled:text-muted-foreground"
+                disabled={somenteLeitura}
               />
               <span className="mt-1 block text-xs text-muted-foreground">
                 {t("Serve para o atendente saber até onde pode negociar. Não aparece para o cliente.")}
@@ -311,6 +424,7 @@ export function ProdutosClient({
               checked={rascunho.controla_estoque}
               onChange={(e) => setRascunho({ ...rascunho, controla_estoque: e.target.checked })}
               data-testid="produto-controla-estoque"
+              disabled={somenteLeitura}
             />
             {t("Controlar estoque deste produto")}
           </label>
@@ -320,7 +434,8 @@ export function ProdutosClient({
               <input
                 value={rascunho.quantidade}
                 onChange={(e) => setRascunho({ ...rascunho, quantidade: e.target.value })}
-                className="mt-1 h-9 w-32 rounded-md border px-3"
+                className="mt-1 h-9 w-32 rounded-md border px-3 disabled:bg-muted disabled:text-muted-foreground"
+                disabled={somenteLeitura}
               />
             </label>
           ) : (
@@ -331,11 +446,16 @@ export function ProdutosClient({
             </p>
           )}
 
-          <div className="mt-4">
-            <Button onClick={salvar} disabled={salvando} data-testid="salvar-produto">
-              {t(salvando ? "Salvando…" : "Salvar produto")}
-            </Button>
-          </div>
+          {!somenteLeitura ? (
+            <div className="mt-4 flex gap-2">
+              <Button onClick={salvar} disabled={salvando} data-testid="salvar-produto">
+                {t(salvando ? "Salvando…" : modo === "editar" ? "Salvar alterações" : "Salvar produto")}
+              </Button>
+              <Button variant="outline" onClick={fechar} disabled={salvando}>
+                {t("Cancelar")}
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -347,7 +467,7 @@ export function ProdutosClient({
       ) : (
         <ul className="divide-y rounded-lg border" data-testid="lista-produtos">
           {filtrados.map((p) => (
-            <li key={p.id} className="flex items-center gap-4 p-3" data-testid={`produto-${p.codigo}`}>
+            <li key={p.id} className="flex items-center gap-3 p-3" data-testid={`produto-${p.codigo}`}>
               <div className="min-w-0 flex-1">
                 <p className={`truncate font-medium ${p.ativo ? "" : "text-muted-foreground line-through"}`}>
                   {p.nome}
@@ -361,18 +481,73 @@ export function ProdutosClient({
                 </p>
               </div>
               <span className="shrink-0 tabular-nums font-medium">
-                {formatCents(p.preco_cents, p.moeda)}
+                {comoMoeda(p.preco_cents, p.moeda)}
               </span>
-              {podeEditar ? (
+
+              <div className="flex shrink-0 items-center gap-1">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => void alternarAtivo(p)}
-                  data-testid={`alternar-${p.codigo}`}
+                  onClick={() => abrirVer(p)}
+                  data-testid={`ver-${p.codigo}`}
                 >
-                  {t(p.ativo ? "Desativar" : "Reativar")}
+                  {t("Ver")}
                 </Button>
-              ) : null}
+                {podeEditar ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => abrirEditar(p)}
+                      data-testid={`editar-${p.codigo}`}
+                    >
+                      {t("Editar")}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => abrirCopiar(p)}
+                      data-testid={`copiar-${p.codigo}`}
+                    >
+                      {t("Copiar")}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void alternarAtivo(p)}
+                      data-testid={`alternar-${p.codigo}`}
+                    >
+                      {t(p.ativo ? "Desativar" : "Reativar")}
+                    </Button>
+                    {confirmandoExclusao?.id === p.id ? (
+                      <span className="flex items-center gap-1">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={excluindoId === p.id}
+                          onClick={() => void excluir(p)}
+                          data-testid={`confirmar-excluir-${p.codigo}`}
+                        >
+                          {t(excluindoId === p.id ? "Excluindo…" : "Confirmar")}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setConfirmandoExclusao(null)}>
+                          {t("Cancelar")}
+                        </Button>
+                      </span>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={() => setConfirmandoExclusao(p)}
+                        data-testid={`excluir-${p.codigo}`}
+                      >
+                        {t("Excluir")}
+                      </Button>
+                    )}
+                  </>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>
