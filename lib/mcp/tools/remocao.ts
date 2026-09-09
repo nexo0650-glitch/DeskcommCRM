@@ -300,12 +300,12 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
     // UI: um agente configurado ANTES da flag mudar, ou um cliente MCP
     // externo chamando o nome direto, ainda tentariam. Esta checagem é quem
     // efetivamente recusa.
-    const { data: org, error: erroFlag } = await ctx.supabase
+    const { data: org, error: erroOrg } = await ctx.supabase
       .from("organizations")
-      .select("settings")
+      .select("settings, base_address")
       .eq("id", ctx.organizationId)
-      .maybeSingle<{ settings: unknown }>();
-    if (erroFlag) throw new Error(`verificar_funcionalidade_falhou: ${erroFlag.message}`);
+      .maybeSingle<{ settings: unknown; base_address: string | null }>();
+    if (erroOrg) throw new Error(`buscar_organizacao_falhou: ${erroOrg.message}`);
     if (!remocaoAtiva(org?.settings)) {
       return {
         erro: "funcionalidade_desativada",
@@ -341,12 +341,6 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
       };
     }
 
-    const { data: org, error: erroOrg } = await ctx.supabase
-      .from("organizations")
-      .select("base_address")
-      .eq("id", ctx.organizationId)
-      .maybeSingle<{ base_address: string | null }>();
-    if (erroOrg) throw new Error(`buscar_organizacao_falhou: ${erroOrg.message}`);
     if (!org?.base_address || org.base_address.trim() === "") {
       return {
         erro: "sem_endereco_de_base",
