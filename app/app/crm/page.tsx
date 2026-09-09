@@ -31,6 +31,7 @@ export default async function CrmHubPage() {
       isPlatformAdmin={user.is_platform_admin && !user.support}
       role={activeOrg?.role ?? null}
       interfaceSettings={activeOrg?.interface_settings}
+      remocaoAtiva={activeOrg?.remocaoAtiva}
       title={traduzir("CRM", idioma)}
       subtitle={traduzir(
         "Onde a venda acontece — e o que você define uma vez para ela funcionar.",

@@ -14,6 +14,7 @@ import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { empresaExigeMfa, exigeCadastroDeMfa } from "@/lib/auth/politica-mfa";
+import { remocaoAtiva } from "@/lib/organizacao/funcionalidades-verticais";
 import { normalizarIdioma } from "@/lib/i18n/idiomas";
 import type { AuthUser, Role, UserOrgMembership, ActiveOrg } from "./types";
 
@@ -31,6 +32,7 @@ interface RawMembershipRow {
 interface OrgJoin {
   display_name: string;
   locale: string | null;
+  settings: unknown;
 }
 
 /**
@@ -179,7 +181,7 @@ export async function loadAuthUser(): Promise<AuthUser | null> {
   const { data: rawMemberships, error: membErro } = await supabase
     .from("user_organizations")
     .select(
-      "organization_id, role, interface_settings, accepted_at, organizations(display_name, locale)",
+      "organization_id, role, interface_settings, accepted_at, organizations(display_name, locale, settings)",
     )
     .eq("user_id", user.id)
     .is("revoked_at", null)
@@ -228,6 +230,7 @@ export async function loadAuthUser(): Promise<AuthUser | null> {
       role: row.role as Role,
       interface_settings: lerInterface(row.interface_settings).settings,
       locale: org?.locale ?? null,
+      remocaoAtiva: remocaoAtiva(org?.settings),
     };
   });
 
@@ -283,6 +286,7 @@ export async function resolveActiveOrg(authUser: AuthUser): Promise<ActiveOrg | 
     name: ativo.organization_name,
     role: ativo.role,
     interface_settings: ativo.interface_settings,
+    remocaoAtiva: ativo.remocaoAtiva,
   };
 }
 

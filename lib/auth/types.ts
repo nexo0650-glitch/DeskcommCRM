@@ -76,6 +76,8 @@ export interface UserOrgMembership {
    * para responder algo que a primeira já tinha em mãos.
    */
   locale?: string | null;
+  /** Ver `lib/organizacao/funcionalidades-verticais.ts`. Ausente = false. */
+  remocaoAtiva?: boolean;
 }
 
 export interface AuthUser {
@@ -173,4 +175,6 @@ export interface ActiveOrg {
    * `window.__PUBLIC_ENV__`, de onde `branding()` a lê.
    */
   marca?: { readonly nome?: string; readonly logoUrl?: string | null };
+  /** Ver `lib/organizacao/funcionalidades-verticais.ts`. Ausente = false. */
+  remocaoAtiva?: boolean;
 }

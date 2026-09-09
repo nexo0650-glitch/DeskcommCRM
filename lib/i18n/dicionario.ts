@@ -37,6 +37,10 @@ import type { Idioma } from "./idiomas";
 type Traducoes = Record<string, Partial<Record<Exclude<Idioma, "pt-BR">, string>>>;
 
 export const DICIONARIO: Traducoes = {
+  "Cálculo de remoção": { es: "Cálculo de remoción" },
+  "Menu e ferramenta de orçamento de remoção — só pra empresas do ramo.": {
+    es: "Menú y herramienta de presupuesto de remoción — solo para empresas del rubro.",
+  },
   // --- Serviços de remoção (migration 0234) ---
   "Serviços de remoção": { es: "Servicios de remoción" },
   "As modalidades de remoção (Simples, SIV, UTI...) com o preço que o agente de IA usa pra calcular orçamento.": { es: "Las modalidades de remoción (Simple, SIV, UCI...) con el precio que el agente de IA usa para calcular el presupuesto." },

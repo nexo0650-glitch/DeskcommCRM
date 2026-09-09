@@ -45,6 +45,7 @@ import { MapCredentialUnavailableError, loadActiveMapCredential } from "@/lib/ma
 import { geocodeAddress, type Coordenada } from "@/lib/maps/validators";
 import { calcularDistanciaMultiTrecho } from "@/lib/maps/rota";
 import { createLeadHandler } from "@/app/api/v1/leads/_handler";
+import { remocaoAtiva } from "@/lib/organizacao/funcionalidades-verticais";
 
 const TIPOS_DE_VIAGEM = ["ida", "ida_e_volta"] as const;
 
@@ -294,6 +295,24 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
   requiresRole: "ai_operator",
   requiresScope: "mcp:write",
   handler: async (input, ctx) => {
+    // Gate de verdade (ver lib/organizacao/funcionalidades-verticais.ts) — o
+    // ToolPicker já não oferece esta tool pra org sem a flag, mas isso é só
+    // UI: um agente configurado ANTES da flag mudar, ou um cliente MCP
+    // externo chamando o nome direto, ainda tentariam. Esta checagem é quem
+    // efetivamente recusa.
+    const { data: org, error: erroFlag } = await ctx.supabase
+      .from("organizations")
+      .select("settings")
+      .eq("id", ctx.organizationId)
+      .maybeSingle<{ settings: unknown }>();
+    if (erroFlag) throw new Error(`verificar_funcionalidade_falhou: ${erroFlag.message}`);
+    if (!remocaoAtiva(org?.settings)) {
+      return {
+        erro: "funcionalidade_desativada",
+        mensagem: "esta empresa não tem o cálculo de remoção ativado — peça a um humano pra confirmar.",
+      };
+    }
+
     if (!input.codigo_servico) {
       return listarServicos(ctx);
     }

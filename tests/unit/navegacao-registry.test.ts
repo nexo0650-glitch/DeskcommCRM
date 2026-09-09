@@ -142,10 +142,15 @@ describe("sidebarGroups", () => {
 });
 
 describe("hubSections", () => {
-  it("o hub do CRM é inventário: as seis telas do grupo, nas duas seções", () => {
+  it("o hub do CRM é inventário: as cinco telas do grupo, nas duas seções", () => {
     // As seções são a régua do sidebar escrita por extenso — o que se abre todo
     // dia contra o que se define uma vez. Lista EXATA: `toContain` deixaria uma
     // tela nova entrar sem que ninguém decidisse de que lado dela ela cai.
+    //
+    // "/app/removal-services" NÃO aparece aqui de propósito: é funcionalidade
+    // de vertical (lib/organizacao/funcionalidades-verticais.ts), escondida
+    // por padrão — só entra com `orgFeatures.remocaoAtiva`, provado no teste
+    // seguinte.
     const secoes = hubSections("crm", true, null);
     expect(secoes.map((s) => s.section)).toEqual(["O dia a dia da venda", "Preparar a venda"]);
     expect(secoes.flatMap((s) => s.items.map((i) => i.href))).toEqual([
@@ -153,9 +158,18 @@ describe("hubSections", () => {
       "/app/contacts",
       "/app/tasks",
       "/app/products",
-      "/app/removal-services",
       "/app/settings/tenant/pipelines",
     ]);
+  });
+
+  it("Serviços de remoção só aparece pra org com a funcionalidade ligada", () => {
+    const semFlag = hubSections("crm", true, null).flatMap((s) => s.items.map((i) => i.href));
+    expect(semFlag).not.toContain("/app/removal-services");
+
+    const comFlag = hubSections("crm", true, null, undefined, { remocaoAtiva: true }).flatMap(
+      (s) => s.items.map((i) => i.href),
+    );
+    expect(comFlag).toContain("/app/removal-services");
   });
 
   it("agrupa a IA nas três etapas da jornada, na ordem", () => {

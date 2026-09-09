@@ -9,6 +9,8 @@ import { hubSections, type NavGroupId } from "@/lib/navigation/registry";
 
 interface NavHubProps {
   interfaceSettings?: InterfaceSettings;
+  /** Ver `lib/organizacao/funcionalidades-verticais.ts`. Ausente = esconde. */
+  remocaoAtiva?: boolean;
   group: NavGroupId;
   isPlatformAdmin: boolean;
   role: Role | null;
@@ -56,9 +58,10 @@ export function NavHub({
   title,
   subtitle,
   interfaceSettings,
+  remocaoAtiva,
   locale = IDIOMA_PADRAO,
 }: NavHubProps) {
-  const secoes = hubSections(group, isPlatformAdmin, role, interfaceSettings);
+  const secoes = hubSections(group, isPlatformAdmin, role, interfaceSettings, { remocaoAtiva });
 
   return (
     <div className="flex h-full flex-col gap-8 p-6">

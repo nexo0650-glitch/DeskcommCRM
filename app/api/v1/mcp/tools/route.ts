@@ -46,6 +46,14 @@ export async function GET(_req: NextRequest): Promise<Response> {
     );
   }
 
+  // Vertical de instalação (ver lib/organizacao/funcionalidades-verticais.ts):
+  // não oferece a capacidade como opção pra configurar numa org que não é do
+  // ramo — não é o gate de verdade (esse mora no handler da tool), é pra não
+  // confundir quem configura um agente de clínica com "orçamento de remoção".
+  if (!activeOrg.remocaoAtiva) {
+    servidas = servidas.filter((c) => c.id !== "crm_calculate_removal_quote");
+  }
+
   const schemaPorNome = new Map(allTools.map((t) => [t.name, t.inputSchema]));
   const tools = servidas.map((capacidade) => ({
     ...capacidade,

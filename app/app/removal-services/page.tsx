@@ -25,6 +25,10 @@ export default async function ServicosRemocaoPage() {
   const t = (texto: string) => traduzir(texto, user.idioma);
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
+  // Ver lib/organizacao/funcionalidades-verticais.ts — vertical de instalação,
+  // não do produto genérico. O link já sai escondido do menu; isto é o gate
+  // de verdade, senão digitar a URL bastaria.
+  if (!activeOrg.remocaoAtiva) redirect("/app");
 
   const podeEditar = (user.is_platform_admin && !user.support) || ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager;
 

@@ -99,6 +99,25 @@ export const NAV_DESTINATIONS: NavDestination[] = NAV_CATALOG.map((d) => ({
   ...d,
   icon: ICONS[d.icon],
 }));
+
+/**
+ * Recursos que só existem pra algumas organizações (vertical específica de
+ * instalação, não do produto genérico). Hoje só remoção — hardcoded de
+ * propósito em vez de um framework genérico de "requiresOrgFeature": é UMA
+ * tela, e generalizar antes de existir uma segunda seria arquitetura pra
+ * hipótese. Escondida por padrão (`remocaoAtiva` ausente = false) — a
+ * direção seguro é sempre esconder, nunca mostrar, quando o chamador não
+ * sabe informar. Só quem chega ao servidor liga: a rota
+ * `/app/removal-services` também se guarda sozinha (ver `page.tsx`), então
+ * esconder o link aqui é UX, não é o gate de verdade.
+ */
+function comFuncionalidadesDaOrg(
+  visible: Set<string>,
+  orgFeatures: { remocaoAtiva?: boolean } | undefined,
+): Set<string> {
+  if (!orgFeatures?.remocaoAtiva) visible.delete("/app/removal-services");
+  return visible;
+}
 /**
  * Único ponto de decisão de permissão da navegação.
  *
@@ -113,9 +132,11 @@ export function sidebarGroups(
   isPlatformAdmin: boolean,
   role: Role | null,
   settings?: InterfaceSettings,
+  orgFeatures?: { remocaoAtiva?: boolean },
 ): Array<{ group: NavGroup; items: NavDestination[] }> {
-  const visible = new Set<string>(
-    destinosDaInterface(settings, isPlatformAdmin, role).map((d) => d.href),
+  const visible = comFuncionalidadesDaOrg(
+    new Set<string>(destinosDaInterface(settings, isPlatformAdmin, role).map((d) => d.href)),
+    orgFeatures,
   );
   return NAV_GROUPS.map((group) => ({
     group,
@@ -141,10 +162,12 @@ export function hubSections(
   isPlatformAdmin: boolean,
   role: Role | null,
   settings?: InterfaceSettings,
+  orgFeatures?: { remocaoAtiva?: boolean },
 ): Array<{ section: string; items: NavDestination[] }> {
   const porSecao = new Map<string, NavDestination[]>();
-  const visible = new Set<string>(
-    destinosDaInterface(settings, isPlatformAdmin, role).map((d) => d.href),
+  const visible = comFuncionalidadesDaOrg(
+    new Set<string>(destinosDaInterface(settings, isPlatformAdmin, role).map((d) => d.href)),
+    orgFeatures,
   );
   for (const d of NAV_DESTINATIONS) {
     if (d.group !== group || !visible.has(d.href)) continue;
@@ -161,9 +184,11 @@ export function searchable(
   isPlatformAdmin: boolean,
   role: Role | null,
   settings?: InterfaceSettings,
+  orgFeatures?: { remocaoAtiva?: boolean },
 ): NavDestination[] {
-  const visible = new Set<string>(
-    destinosDaInterface(settings, isPlatformAdmin, role).map((d) => d.href),
+  const visible = comFuncionalidadesDaOrg(
+    new Set<string>(destinosDaInterface(settings, isPlatformAdmin, role).map((d) => d.href)),
+    orgFeatures,
   );
   return NAV_DESTINATIONS.filter((d) => visible.has(d.href));
 }
