@@ -65,6 +65,11 @@ export const DICIONARIO: Traducoes = {
   "Some ao preço acima por km rodado entre origem e destino. Usado pelo cálculo de orçamento de remoção — deixe em branco se este produto não é cobrado por distância.": { es: "Se suma al precio de arriba por km recorrido entre origen y destino. Usado por el cálculo de presupuesto de remoción — déjelo en blanco si este producto no se cobra por distancia." },
   "+": { es: "+" },
   "por km": { es: "por km" },
+  "Endereço da base": { es: "Dirección de la base" },
+  "Rua, número, bairro, cidade": { es: "Calle, número, barrio, ciudad" },
+  "De onde o veículo sai. Usado pelo cálculo de orçamento de remoção para somar o trecho até o endereço de origem.": {
+    es: "De dónde sale el vehículo. Usado por el cálculo de presupuesto de remoción para sumar el tramo hasta la dirección de origen.",
+  },
   "números de teste autorizados": { es: "números de prueba autorizados" },
   "1 número de teste autorizado": { es: "1 número de prueba autorizado" },
   "Nenhum número autorizado — a IA não responde ninguém neste canal.": {

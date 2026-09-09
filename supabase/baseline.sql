@@ -23323,6 +23323,12 @@ end $$;
 
 notify pgrst, 'reload schema';
 
+-- ---- endereço da base de despacho (migration 0233) ----
+alter table public.organizations
+  add column if not exists base_address text;
+
+notify pgrst, 'reload schema';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ ESTE BLOCO É, DE PROPÓSITO, O ÚLTIMO DO ARQUIVO. Apêndice novo entra ANTES

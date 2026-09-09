@@ -25,28 +25,40 @@ export type DistanciaResult =
   | { ok: false; error: string };
 
 /**
+ * Distância de uma rota com QUALQUER número de pontos, na ordem dada —
+ * `pontos` vira uma sequência de trechos (Base→origem→destino→Base, por
+ * exemplo), e o resultado já vem SOMADO pelo próprio provedor: uma só
+ * chamada, não uma por trecho (mais barato de cota e evita que o total
+ * some erros de arredondamento de várias respostas).
+ *
  * `driving-car`: remoção é sempre por via terrestre, veículo — não há perfil
  * de pé/bicicleta que faça sentido pra ambulância.
+ *
+ * POST porque o GET de `/v2/directions/{profile}` só aceita 2 pontos
+ * (`start`/`end`); rota de N pontos exige o corpo `coordinates`.
  */
-export async function calcularDistanciaKm(
+export async function calcularDistanciaMultiTrecho(
   apiKey: string,
-  origem: Coordenada,
-  destino: Coordenada,
+  pontos: readonly Coordenada[],
 ): Promise<DistanciaResult> {
+  if (pontos.length < 2) {
+    return { ok: false, error: "pontos_insuficientes" };
+  }
   try {
-    const url =
-      "https://api.openrouteservice.org/v2/directions/driving-car?" +
-      new URLSearchParams({
-        api_key: apiKey,
-        start: `${origem.lon},${origem.lat}`,
-        end: `${destino.lon},${destino.lat}`,
-      }).toString();
-    const res = await timedFetch(url, { method: "GET" });
+    const url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
+    const res = await timedFetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ coordinates: pontos.map((p) => [p.lon, p.lat]) }),
+    });
     if (res.status === 401 || res.status === 403) {
       return { ok: false, error: "auth_failed_401" };
     }
     if (res.status === 404 || res.status === 400) {
-      // ORS devolve 404/400 quando um dos pontos não tem via rodoviária
+      // ORS devolve 404/400 quando algum ponto não tem via rodoviária
       // alcançável perto (meio do oceano, endereço geocodificado errado).
       return { ok: false, error: "rota_nao_encontrada" };
     }
@@ -68,4 +80,13 @@ export async function calcularDistanciaKm(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.name : "network_error" };
   }
+}
+
+/** Atalho pra rota de 2 pontos — mesma função, só sem o array na chamada. */
+export function calcularDistanciaKm(
+  apiKey: string,
+  origem: Coordenada,
+  destino: Coordenada,
+): Promise<DistanciaResult> {
+  return calcularDistanciaMultiTrecho(apiKey, [origem, destino]);
 }

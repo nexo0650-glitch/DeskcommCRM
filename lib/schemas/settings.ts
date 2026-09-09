@@ -108,6 +108,16 @@ export const tenantSchema = z.object({
     .nullable()
     .optional()
     .or(z.literal("").transform(() => null)),
+  // Endereço de onde o veículo sai (garagem/base). Usado hoje só pelo cálculo
+  // de orçamento de remoção (soma o trecho Base→origem ao trajeto), mas o
+  // conceito não é específico de remoção — qualquer negócio que despache de
+  // um endereço fixo pode usar. DIRC: um só por org, cabe direto na tabela.
+  base_address: z
+    .string()
+    .max(500)
+    .nullable()
+    .optional()
+    .or(z.literal("").transform(() => null)),
   lost_reasons_extra: z.array(z.string().min(1).max(80)).max(50).default([]),
 });
 export type TenantInput = z.infer<typeof tenantSchema>;

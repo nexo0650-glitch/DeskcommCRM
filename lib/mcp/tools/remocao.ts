@@ -2,31 +2,36 @@
  * Capacidade de REMOÇÃO — orçamento de transporte (ambulância) por distância.
  *
  * Vertical específica desta instalação, não do produto genérico: preço =
- * `catalog_products.preco_cents` (fixo da modalidade) + km rodado entre
- * origem e destino × `catalog_products.price_per_km_cents`. As duas colunas
- * já existem no catálogo comum (migration 0232) — nenhuma tabela nova de
- * domínio, é DIRC puro.
+ * `catalog_products.preco_cents` (fixo da modalidade) + km rodado ×
+ * `catalog_products.price_per_km_cents` (migration 0232). O km rodado NÃO é
+ * só origem→destino: o veículo sai da Base (`organizations.base_address`,
+ * migration 0233), então o trecho Base→origem sempre entra na conta — e,
+ * numa remoção de ida e volta, o trecho de volta (destino→origem) e o
+ * retorno à Base (origem→Base) entram também.
  *
- * Nunca deixa o modelo estimar distância ou preço: geocodifica os dois
- * endereços e calcula a rota de verdade contra a OpenRouteService. Se
- * qualquer passo falhar (sem credencial, endereço não encontrado, rota
- * impossível), devolve um erro estruturado — a mesma doutrina de
- * `crm_search_products`, que prefere "não sei" a um número inventado.
+ * Nunca deixa o modelo estimar distância ou preço: geocodifica os endereços
+ * e calcula a rota de verdade, num único pedido de rota multi-trecho, contra
+ * a OpenRouteService. Se qualquer passo falhar (sem credencial, sem base
+ * cadastrada, endereço não encontrado, rota impossível), devolve um erro
+ * estruturado — a mesma doutrina de `crm_search_products`, que prefere "não
+ * sei" a um número inventado.
  */
 import { z } from "zod";
 
 import type { McpToolDefinition } from "../types";
 import { formatCents } from "@/lib/money";
 import { MapCredentialUnavailableError, loadActiveMapCredential } from "@/lib/maps/credenciais/carregar";
-import { geocodeAddress } from "@/lib/maps/validators";
-import { calcularDistanciaKm } from "@/lib/maps/rota";
+import { geocodeAddress, type Coordenada } from "@/lib/maps/validators";
+import { calcularDistanciaMultiTrecho } from "@/lib/maps/rota";
+
+const TIPOS_DE_VIAGEM = ["ida", "ida_e_volta"] as const;
 
 const inputShape = {
   endereco_origem: z
     .string()
     .trim()
     .min(5)
-    .describe("Endereço completo de onde o veículo sai buscar o paciente (rua, número, bairro, cidade)."),
+    .describe("Endereço completo de onde o veículo vai buscar o paciente (rua, número, bairro, cidade)."),
   endereco_destino: z
     .string()
     .trim()
@@ -40,6 +45,13 @@ const inputShape = {
       "O código da modalidade de remoção, como veio de crm_search_products (ex.: REMOCAO-SIMPLES). " +
         "Sempre busque o código com crm_search_products antes — nunca invente um código.",
     ),
+  tipo_viagem: z
+    .enum(TIPOS_DE_VIAGEM)
+    .describe(
+      "'ida' se o paciente só vai (o veículo sai da Base, busca, leva ao destino e volta pra Base). " +
+        "'ida_e_volta' se o veículo também traz o paciente de volta ao endereço de origem antes de " +
+        "voltar pra Base. Pergunte ao cliente qual é o caso — nunca assuma.",
+    ),
 };
 
 interface ProdutoRemocao {
@@ -51,14 +63,28 @@ interface ProdutoRemocao {
   ativo: boolean;
 }
 
+/** Monta a sequência de trechos na ordem que o veículo realmente percorre. */
+function trajetoDaViagem(
+  tipo: (typeof TIPOS_DE_VIAGEM)[number],
+  base: Coordenada,
+  origem: Coordenada,
+  destino: Coordenada,
+): Coordenada[] {
+  return tipo === "ida_e_volta"
+    ? [base, origem, destino, origem, base]
+    : [base, origem, destino, base];
+}
+
 export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
   name: "crm_calculate_removal_quote",
   description:
-    "Calcula o ORÇAMENTO EXATO de uma remoção: geocodifica origem e destino, calcula a distância rodoviária " +
-    "de verdade e soma o preço fixo da modalidade com o valor por km cadastrado. Use SEMPRE que o cliente " +
-    "pedir preço de remoção com endereço de origem e destino — nunca estime distância ou valor de cabeça, " +
-    "peça errado é promessa que a empresa terá de cumprir ou desfazer. " +
-    "Busque o código da modalidade com crm_search_products ANTES de chamar esta ferramenta. " +
+    "Calcula o ORÇAMENTO EXATO de uma remoção: geocodifica a Base da empresa e os endereços de origem e " +
+    "destino, calcula a distância rodoviária de verdade do trajeto completo (Base até o paciente, do " +
+    "paciente ao destino, e a volta) e soma o preço fixo da modalidade com o valor por km cadastrado. " +
+    "Use SEMPRE que o cliente pedir preço de remoção com endereço de origem e destino — nunca estime " +
+    "distância ou valor de cabeça, preço errado é promessa que a empresa terá de cumprir ou desfazer. " +
+    "Busque o código da modalidade com crm_search_products ANTES de chamar esta ferramenta, e pergunte " +
+    "ao cliente se é só ida ou ida e volta. " +
     "Se voltar um erro, explique ao cliente o que falta (endereço mais completo, por exemplo) ou peça para " +
     "um humano ajudar — não responda um preço quando esta ferramenta não confirmou um.",
   inputSchema: inputShape,
@@ -88,6 +114,21 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
       };
     }
 
+    const { data: org, error: erroOrg } = await ctx.supabase
+      .from("organizations")
+      .select("base_address")
+      .eq("id", ctx.organizationId)
+      .maybeSingle<{ base_address: string | null }>();
+    if (erroOrg) throw new Error(`buscar_organizacao_falhou: ${erroOrg.message}`);
+    if (!org?.base_address || org.base_address.trim() === "") {
+      return {
+        erro: "sem_endereco_de_base",
+        mensagem:
+          "esta empresa ainda não cadastrou o endereço da Base (de onde o veículo sai) — peça a um humano " +
+          "para configurar em Configurações › Organização antes de fechar orçamento.",
+      };
+    }
+
     let credencial;
     try {
       credencial = await loadActiveMapCredential(ctx.organizationId, "openrouteservice");
@@ -104,11 +145,21 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
       throw err;
     }
 
-    const [origem, destino] = await Promise.all([
+    const [base, origem, destino] = await Promise.all([
+      geocodeAddress(credencial.apiKey, org.base_address),
       geocodeAddress(credencial.apiKey, input.endereco_origem),
       geocodeAddress(credencial.apiKey, input.endereco_destino),
     ]);
 
+    if (!base.ok) {
+      return {
+        erro: "endereco_nao_encontrado",
+        campo: "base",
+        mensagem:
+          "não encontrei o endereço da Base cadastrado pela empresa. Peça a um humano para corrigir em " +
+          "Configurações › Organização.",
+      };
+    }
     if (!origem.ok) {
       return {
         erro: "endereco_nao_encontrado",
@@ -124,11 +175,12 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
       };
     }
 
-    const rota = await calcularDistanciaKm(credencial.apiKey, origem.coordenada, destino.coordenada);
+    const trajeto = trajetoDaViagem(input.tipo_viagem, base.coordenada, origem.coordenada, destino.coordenada);
+    const rota = await calcularDistanciaMultiTrecho(credencial.apiKey, trajeto);
     if (!rota.ok) {
       return {
         erro: "rota_nao_calculada",
-        mensagem: "não consegui calcular a rota entre esses dois endereços. Peça a um humano para confirmar o orçamento.",
+        mensagem: "não consegui calcular a rota completa entre esses endereços. Peça a um humano para confirmar o orçamento.",
       };
     }
 
@@ -139,6 +191,8 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
     return {
       modalidade: produto.nome,
       codigo_produto: produto.codigo,
+      tipo_viagem: input.tipo_viagem,
+      base_confirmada: base.rotulo,
       origem_confirmada: origem.rotulo,
       destino_confirmado: destino.rotulo,
       distancia_km: distanciaKm,
@@ -148,7 +202,10 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
       preco_total: formatCents(precoTotalCents, produto.moeda),
       preco_total_cents: precoTotalCents,
       mensagem:
-        "Confirme os dois endereços encontrados com o cliente antes de fechar — se um deles não bate com o que ele pediu, peça o endereço de novo.",
+        "A distância já inclui o trajeto do veículo (Base até o paciente" +
+        (input.tipo_viagem === "ida_e_volta" ? ", ida e volta do paciente" : "") +
+        " e o retorno à Base). Confirme os endereços encontrados com o cliente antes de fechar — se algum " +
+        "não bater com o que ele pediu, peça o endereço de novo.",
     };
   },
 };

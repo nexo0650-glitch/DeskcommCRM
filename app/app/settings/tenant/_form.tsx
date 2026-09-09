@@ -175,6 +175,19 @@ export function TenantForm({ initial }: Props) {
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="base_address">{t("Endereço da base")}</Label>
+          <Input
+            id="base_address"
+            value={form.base_address ?? ""}
+            onChange={(e) => set("base_address", e.target.value || null)}
+            placeholder={t("Rua, número, bairro, cidade")}
+          />
+          <p className="text-xs text-muted-foreground">
+            {t("De onde o veículo sai. Usado pelo cálculo de orçamento de remoção para somar o trecho até o endereço de origem.")}
+          </p>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="lost_reasons">{t("Motivos de perda extras (separados por vírgula)")}</Label>
           <Input
             id="lost_reasons"
