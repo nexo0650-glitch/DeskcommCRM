@@ -285,7 +285,13 @@ export const crmCalculateRemovalQuote: McpToolDefinition<typeof inputShape> = {
     "preço quando esta ferramenta não confirmou um.",
   inputSchema: inputShape,
   category: "write",
-  requiresRole: "agent",
+  // ai_operator, não agent: não há rota HTTP equivalente pra um atendente
+  // humano fazer esta MESMA ação combinada (calcular + criar protocolo), e o
+  // piso de escrita sem par humano é ai_operator — ver
+  // tests/unit/capacidade-alcancavel-pelo-agente.test.ts. O agente publicado
+  // roda com ai_operator (não "agent", apesar do nome), então isto não muda
+  // o alcance real — só declara a intenção certa.
+  requiresRole: "ai_operator",
   requiresScope: "mcp:write",
   handler: async (input, ctx) => {
     if (!input.codigo_servico) {

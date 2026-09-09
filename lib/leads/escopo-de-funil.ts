@@ -127,6 +127,19 @@ export const ALVO_DE_FUNIL: Record<string, AlvoDeFunil> = {
   crm_create_webhook_source: "sem_funil",
   crm_set_webhook_source_active: "sem_funil",
   crm_set_automation_rule_active: "sem_funil",
+  // Cria lead de verdade (protocolo de remoção), mas o pipeline NUNCA vem do
+  // modelo nem varia por chamada — a tool sempre resolve o pipeline padrão da
+  // org internamente (`acharDestinoPadrao` em lib/mcp/tools/remocao.ts).
+  // Classificar como `pipeline_no_argumento` seria teatro na direção oposta
+  // da já documentada acima (agenda): não existe `pipeline_id` nos argumentos
+  // pra ler, então o veredito seria sempre `indisponivel` — bloqueio, não
+  // vazamento, mas ainda assim uma checagem que nunca decide nada de verdade.
+  // Limitação conhecida: numa org com MAIS de um pipeline e agentes
+  // escopados a funis diferentes, este protocolo ainda cairia sempre no
+  // padrão da org, ignorando o escopo do agente que chamou. Não é risco hoje
+  // (esta org tem um pipeline só) — fica declarado para quem for dar
+  // pipeline_id configurável a esta tool depois.
+  crm_calculate_removal_quote: "sem_funil",
 };
 
 /**
