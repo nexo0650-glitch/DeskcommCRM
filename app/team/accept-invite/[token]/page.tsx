@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AcceptInviteForm } from "./AcceptInviteForm";
 import { normalizarIdioma } from "@/lib/i18n/idiomas";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { signOut } from "@/app/actions/auth/signOut";
 
 export const dynamic = "force-dynamic";
 
@@ -114,7 +115,11 @@ export default async function AcceptInvitePage({ params }: PageProps) {
           {t("mas o convite foi enviado para")} <strong>{payload.email}</strong>.{" "}
           {t("Saia e faça login com o email correto.")}
         </p>
-        <form action="/api/auth/signout" method="post" className="mt-4">
+        {/* Rota inexistente ("/api/auth/signout") — o clique não fazia nada além
+            de um 404 silencioso, e a pessoa ficava presa nesta tela sem saída.
+            A Server Action é o mesmo caminho que o menu principal usa
+            (UserMenu.tsx → useAuth().signOut() → esta função). */}
+        <form action={signOut} className="mt-4">
           <button
             type="submit"
             className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"

@@ -37,6 +37,10 @@ import type { Idioma } from "./idiomas";
 type Traducoes = Record<string, Partial<Record<Exclude<Idioma, "pt-BR">, string>>>;
 
 export const DICIONARIO: Traducoes = {
+  "Atendimento e vendas por WhatsApp, com agentes de IA.": {
+    es: "Atención y ventas por WhatsApp, con agentes de IA.",
+  },
+  "Criar empresa": { es: "Crear empresa" },
   "Cálculo de remoção": { es: "Cálculo de remoción" },
   "Menu e ferramenta de orçamento de remoção — só pra empresas do ramo.": {
     es: "Menú y herramienta de presupuesto de remoción — solo para empresas del rubro.",
