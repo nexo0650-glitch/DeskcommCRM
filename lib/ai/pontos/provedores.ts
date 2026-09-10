@@ -83,6 +83,26 @@ export const PROVEDORES = [
     ondePegarAChave: "https://openrouter.ai/keys",
     prefixoDaChave: "sk-or-…",
   },
+  {
+    id: "groq",
+    rotulo: "Groq",
+    quandoUsar:
+      "Infraestrutura própria (LPU) feita pra responder muito rápido — modelos abertos, bom quando o tempo de resposta importa mais do que ser o modelo mais forte do mercado.",
+    aceitaEndpointProprio: false,
+    catalogoSincronizavel: false,
+    ondePegarAChave: "https://console.groq.com/keys",
+    prefixoDaChave: "gsk_…",
+  },
+  {
+    id: "nvidia",
+    rotulo: "NVIDIA (NIM)",
+    quandoUsar:
+      "Catálogo amplo de modelos abertos (Llama, DeepSeek, Nemotron e outros) hospedados pela própria NVIDIA — alternativa para quem já usa a infraestrutura deles ou quer variedade sem trocar de provedor a cada modelo novo.",
+    aceitaEndpointProprio: false,
+    catalogoSincronizavel: false,
+    ondePegarAChave: "https://build.nvidia.com/settings/api-keys",
+    prefixoDaChave: "nvapi-…",
+  },
 ] as const satisfies readonly ProvedorSuportado[];
 // `as const satisfies` e não anotação de tipo: a anotação apagaria os literais
 // e `Provider` viraria `string`, deixando o compilador aceitar qualquer texto

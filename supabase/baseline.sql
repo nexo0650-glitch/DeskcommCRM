@@ -23667,6 +23667,42 @@ create trigger trg_ai_agent_versions_content_immutable
 
 notify pgrst, 'reload schema';
 
+-- ---- provedores Groq e NVIDIA no catálogo de modelos (migration 0238) ----
+-- Schema já aberto desde a 0127 (sem CHECK em provider) — só falta o
+-- catálogo curado pra tela ter o que oferecer. Ver o cabeçalho da migration
+-- 0238 pra proveniência dos ids e por que sem linha em ai_pricing.
+insert into public.ai_models
+  (provider, model_id, display_name, description,
+   input_price_per_million_cents, output_price_per_million_cents, supports_tools)
+values
+  ('groq', 'llama-4-maverick', 'Llama 4 Maverick (Groq)',
+   'O mais capaz hospedado pela Groq — resposta rápida por causa da infraestrutura deles, não do tamanho do modelo.', 50, 77, true),
+  ('groq', 'llama-4-scout',    'Llama 4 Scout (Groq)',
+   'Menor e mais rápido que o Maverick — bom para classificação e tarefas curtas.', 11, 34, true),
+  ('groq', 'gpt-oss-120b',     'GPT-OSS 120B (Groq)',
+   'Modelo aberto de raciocínio da OpenAI, hospedado na Groq.', 15, 60, true),
+  ('groq', 'qwen3-32b',        'Qwen3 32B (Groq)',           null, 29, 59, true),
+  ('nvidia', 'nvidia/nemotron-3.5-lightning', 'Nemotron 3.5 Lightning (NVIDIA)',
+   'Modelo próprio da NVIDIA, ajustado para resposta rápida.', 20, 40, true),
+  ('nvidia', 'nvidia/nemotron-3-super-120b-a12b', 'Nemotron 3 Super 120B (NVIDIA)',
+   'Maior da família Nemotron — mais capaz, custo mais alto.', 90, 180, true),
+  ('nvidia', 'meta/llama-4-maverick-instruct', 'Llama 4 Maverick (NVIDIA NIM)',
+   'O mesmo Llama 4 Maverick, hospedado pela NVIDIA em vez da Groq.', 50, 77, true),
+  ('nvidia', 'deepseek-ai/deepseek-v4-flash', 'DeepSeek V4 Flash (NVIDIA NIM)', null, 27, 110, true)
+on conflict (provider, model_id) do update set
+  display_name = excluded.display_name,
+  description = excluded.description,
+  input_price_per_million_cents = excluded.input_price_per_million_cents,
+  output_price_per_million_cents = excluded.output_price_per_million_cents,
+  supports_tools = excluded.supports_tools;
+
+update public.ai_models set is_default_for_provider = false
+ where provider in ('groq', 'nvidia') and is_default_for_provider;
+
+update public.ai_models set is_default_for_provider = true
+ where (provider = 'groq'   and model_id = 'llama-4-maverick')
+    or (provider = 'nvidia' and model_id = 'nvidia/nemotron-3.5-lightning');
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ ESTE BLOCO É, DE PROPÓSITO, O ÚLTIMO DO ARQUIVO. Apêndice novo entra ANTES

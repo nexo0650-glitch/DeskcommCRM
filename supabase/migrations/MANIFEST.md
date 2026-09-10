@@ -254,6 +254,7 @@ aplica.
 | `20260909040000` | `0235_protocolo_de_remocao` | `crm_leads.protocol_number` (sequencial por org, atribuído por trigger em `organizations.next_lead_protocol_number`) — genérico de CRM, usado hoje pelo cálculo de orçamento de remoção pra criar um lead/protocolo novo a cada cotação completa, sem misturar pedidos do mesmo contato. |
 | `20260910010000` | `0236_conexoes_mcp_externas` | `external_mcp_connections` — URL + chave cifrada por organização pra conectar a servidor MCP de outro sistema, validada de verdade antes de ativar. Mesmo molde de `ai_provider_credentials`/`map_provider_credentials`, sem enum de provider fixo. |
 | `20260910020000` | `0237_mcp_connection_ids_do_agente` | `ai_agent_versions.mcp_connection_ids` — em quais conexões MCP externas (0236) o Conversador deste agente pode chamar ferramenta durante a conversa. Vazio = nenhuma. Trigger de imutabilidade estendido. |
+| `20260910030000` | `0238_provedores_groq_e_nvidia` | Catálogo curado (`ai_models`) para os provedores Groq e NVIDIA (NIM), 4 modelos cada, com padrão por provedor. Schema já estava aberto desde a 0127 — só faltava o catálogo pra tela ter o que oferecer. |
 
 ## Reproducibility
 

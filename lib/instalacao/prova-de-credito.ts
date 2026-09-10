@@ -21,6 +21,8 @@
 import { normalizarErro } from "@/lib/agent-engine/edge/llm/run-model-call";
 import {
   cabecalhosDeAtribuicaoOpenRouter,
+  GROQ_ENDPOINT,
+  NVIDIA_ENDPOINT,
   OPENROUTER_ENDPOINT,
 } from "@/lib/agent-engine/edge/llm/providers";
 
@@ -93,6 +95,20 @@ export function montarRequisicaoDeProva(
           contents: [{ parts: [{ text: "oi" }] }],
           generationConfig: { maxOutputTokens: 1 },
         },
+      };
+    // Groq e NVIDIA NIM falam o formato de chat/completions da OpenAI — mesmo
+    // corpo do caso "openai" acima, só troca o endpoint.
+    case "groq":
+      return {
+        url: `${GROQ_ENDPOINT}/chat/completions`,
+        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        body: { model: modelo, max_tokens: 1, messages: msg },
+      };
+    case "nvidia":
+      return {
+        url: `${NVIDIA_ENDPOINT}/chat/completions`,
+        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        body: { model: modelo, max_tokens: 1, messages: msg },
       };
     default:
       // Fail-closed: provedor que este módulo não sabe cobrar não recebe um

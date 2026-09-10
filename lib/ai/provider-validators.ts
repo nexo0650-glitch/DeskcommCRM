@@ -169,6 +169,54 @@ export async function validateOpenRouterKey(apiKey: string): Promise<ValidationR
   }
 }
 
+/**
+ * Groq expõe `/openai/v1/models` no formato da OpenAI — mesma prova (endpoint
+ * exige credencial, catálogo real vem junto) que `validateOpenAIKey`.
+ */
+export async function validateGroqKey(apiKey: string): Promise<ValidationResult> {
+  try {
+    const res = await timedFetch("https://api.groq.com/openai/v1/models", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, error: "auth_failed_401" };
+    }
+    if (!res.ok) {
+      return { ok: false, error: `provider_status_${res.status}` };
+    }
+    const json = (await res.json()) as { data?: { id: string }[] };
+    const models = (json.data ?? []).map((m) => m.id).filter(Boolean);
+    return { ok: true, models };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.name : "network_error" };
+  }
+}
+
+/**
+ * NVIDIA NIM (`integrate.api.nvidia.com`) também fala o formato da OpenAI —
+ * mesma prova dos irmãos acima.
+ */
+export async function validateNvidiaKey(apiKey: string): Promise<ValidationResult> {
+  try {
+    const res = await timedFetch("https://integrate.api.nvidia.com/v1/models", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, error: "auth_failed_401" };
+    }
+    if (!res.ok) {
+      return { ok: false, error: `provider_status_${res.status}` };
+    }
+    const json = (await res.json()) as { data?: { id: string }[] };
+    const models = (json.data ?? []).map((m) => m.id).filter(Boolean);
+    return { ok: true, models };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.name : "network_error" };
+  }
+}
+
 export function validateProviderKey(
   provider: Provider,
   apiKey: string,
@@ -182,6 +230,10 @@ export function validateProviderKey(
       return validateGoogleKey(apiKey);
     case "openrouter":
       return validateOpenRouterKey(apiKey);
+    case "groq":
+      return validateGroqKey(apiKey);
+    case "nvidia":
+      return validateNvidiaKey(apiKey);
     default: {
       // Sem `never` aqui: `Provider` agora é derivado de PROVEDORES, e a lista
       // cresce sem que este arquivo saiba. Provedor novo cadastrado antes de

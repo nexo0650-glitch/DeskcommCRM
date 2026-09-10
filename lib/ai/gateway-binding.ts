@@ -32,6 +32,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 import { OPENROUTER_BASE_URL, resolveLanguageModel, type ModelId } from "./gateway";
 
+// Mesma duplicação consciente do resto deste arquivo (ver cabeçalho) — Groq e
+// NVIDIA NIM falam a API da OpenAI, igual a OpenRouter.
+const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
+const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1";
+
 export interface ModeloResolvido {
   model: LanguageModel;
   /** Para o log: qual modelo e de onde veio a decisão. */
@@ -287,6 +292,10 @@ function instanciar(
       return createGoogleGenerativeAI({ apiKey })(modelId);
     case "openrouter":
       return createOpenAI({ apiKey, baseURL: baseUrl ?? OPENROUTER_BASE_URL })(modelId);
+    case "groq":
+      return createOpenAI({ apiKey, baseURL: baseUrl ?? GROQ_BASE_URL })(modelId);
+    case "nvidia":
+      return createOpenAI({ apiKey, baseURL: baseUrl ?? NVIDIA_BASE_URL })(modelId);
     default:
       return null;
   }

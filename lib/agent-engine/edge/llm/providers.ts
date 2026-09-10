@@ -42,6 +42,12 @@ const GOOGLE_ENDPOINT = 'https://generativelanguage.googleapis.com';
  * `familia/modelo`, o mesmo dos nossos, sem tradução no meio.
  */
 export const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1';
+/**
+ * Groq e NVIDIA NIM falam a API da OpenAI (mesmo caso da OpenRouter acima) —
+ * o provider `@ai-sdk/openai` conversa com os dois sem dependência nova.
+ */
+export const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1';
+export const NVIDIA_ENDPOINT = 'https://integrate.api.nvidia.com/v1';
 
 /**
  * Cabeçalhos OPCIONAIS de atribuição da OpenRouter.
@@ -112,6 +118,10 @@ export function createDefaultRegistry(opts?: { allowedHosts?: string[] }): Provi
         fetch: contain(endpoint),
       })(modelId);
     },
+    groq: (apiKey, modelId) =>
+      createOpenAI({ apiKey, baseURL: GROQ_ENDPOINT, fetch: contain(GROQ_ENDPOINT) })(modelId),
+    nvidia: (apiKey, modelId) =>
+      createOpenAI({ apiKey, baseURL: NVIDIA_ENDPOINT, fetch: contain(NVIDIA_ENDPOINT) })(modelId),
   };
 }
 
