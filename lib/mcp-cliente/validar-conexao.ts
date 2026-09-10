@@ -7,9 +7,10 @@
  * 1. **SSRF**: resolve o hostname e recusa qualquer IP privado/loopback/
  *    link-local ANTES de conectar. Sem isso, um admin (ou uma conta
  *    comprometida) usaria este campo pra fazer o servidor bater em
- *    `http://localhost:6379` (Redis), `http://waha:3000` ou qualquer coisa
- *    na rede interna da VPS — a mesma classe de ataque que a doutrina de
- *    threat-model do repo já nomeia pra outros egressos.
+ *    `http://localhost:6379` (Redis), num serviço interno qualquer da rede
+ *    docker da VPS pelo nome do container, ou qualquer coisa na rede interna
+ *    — a mesma classe de ataque que a doutrina de threat-model do repo já
+ *    nomeia pra outros egressos.
  *
  *    ⚠️ Isto é uma checagem PRÉ-conexão, não um proxy que resolve e ABRE a
  *    conexão no IP já resolvido — sobra uma janela TOCTOU (DNS rebinding:
