@@ -424,8 +424,11 @@ export function createOperatorTurnHandler(deps: InboundTurnDeps) {
           // A ponte lê `toolIds`; o papel guarda a lista dele em
           // `operatorToolIds`. A troca acontece AQUI, num ponto só, para que
           // nenhum caminho do Operador alcance a lista do Conversador por
-          // engano — que seria dar a ele a mão do outro.
-          { ...agentConfig, toolIds: agentConfig.operatorToolIds },
+          // engano — que seria dar a ele a mão do outro. `mcpConnectionIds`
+          // zerado pelo mesmo motivo: conexão MCP externa é escopo do
+          // Conversador (2026-09-10); sem isto o spread levaria a lista do
+          // Conversador pro Operador de graça, sem ele ter marcado nada.
+          { ...agentConfig, toolIds: agentConfig.operatorToolIds, mcpConnectionIds: [] },
           log,
         );
       } catch (err) {

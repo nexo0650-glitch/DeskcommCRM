@@ -8,6 +8,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { AgentForm, type ChannelSessionLite } from "./AgentForm";
 import type { CoberturaPorFunil } from "./FunisDoAgente";
 import type { MaterialDoAcervo } from "./BasesDoAgente";
+import type { ConexaoMcpDoAgente } from "./ConexoesDoAgente";
 import type { FunilDaResposta } from "@/hooks/pipelines/usePipelines";
 import { TestPanel } from "./TestPanel";
 import { RunsTable } from "./RunsTable";
@@ -24,6 +25,8 @@ interface Props {
   cobertura?: CoberturaPorFunil;
   /** O acervo da organização, para a seção "o que ele consulta" (0181). */
   materiais?: MaterialDoAcervo[];
+  /** As conexões MCP externas ativas da organização (2026-09-10). */
+  conexoesMcp?: ConexaoMcpDoAgente[];
   agent: AgentRow;
   draft: AgentVersionRow | null;
   published: AgentVersionRow | null;
@@ -78,6 +81,7 @@ export function AgentTabs(props: Props) {
           funis={props.funis}
           cobertura={props.cobertura}
           materiais={props.materiais}
+          conexoesMcp={props.conexoesMcp}
           routerMembership={props.routerMembership}
           readOnly={props.readOnly}
         />

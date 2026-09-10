@@ -11,6 +11,7 @@ import type { CredentialRow } from "@/hooks/ai/useCredentials";
 import { LegacyRecovery } from "./_components/LegacyRecovery";
 import { AgentOperation } from "./_components/AgentOperation";
 import type { MaterialDoAcervo } from "./_components/BasesDoAgente";
+import type { ConexaoMcpDoAgente } from "./_components/ConexoesDoAgente";
 import { AgentTabs } from "./_components/AgentTabs";
 import type { FunilDaResposta } from "@/hooks/pipelines/usePipelines";
 import { coberturaDoFunil, type EtapaDoMapa } from "@/lib/leads/agent-mapping";
@@ -24,7 +25,7 @@ const AGENT_COLUMNS =
   "id, organization_id, name, description, model, system_prompt, is_active, is_default, kind, priority, published_version_id, paused_at, operation_mode, operation_revision, archived_at, config, guardrails, active_kb_version_id, created_at, updated_at";
 
 const VERSION_COLUMNS =
-  "id, organization_id, agent_id, version_number, system_prompt, provider, model, credential_id, tool_ids, trigger_config, channel_session_id, max_steps, token_budget, cost_budget_cents, history_message_window, history_token_window, handoff_keywords, handoff_tool_enabled, cases_enabled, split_messages, split_max_chars, followup, operator_enabled, operator_model, operator_tool_ids, status, published_at, superseded_at, created_at, created_by,pipeline_ids,knowledge_source_ids,provisioning_origin";
+  "id, organization_id, agent_id, version_number, system_prompt, provider, model, credential_id, tool_ids, trigger_config, channel_session_id, max_steps, token_budget, cost_budget_cents, history_message_window, history_token_window, handoff_keywords, handoff_tool_enabled, cases_enabled, split_messages, split_max_chars, followup, operator_enabled, operator_model, operator_tool_ids, status, published_at, superseded_at, created_at, created_by,pipeline_ids,knowledge_source_ids,mcp_connection_ids,provisioning_origin";
 
 const CREDENTIAL_COLUMNS =
   "id, organization_id, provider, label, api_key_last4, validated_at, validation_error, models_available, is_active, created_by, created_at, updated_at";
@@ -68,7 +69,7 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
   const readOnly = ROLE_RANK[activeOrg.role] < ROLE_RANK.admin;
 
   // mcp_agent: busca versions + lookups.
-  const [versionsRes, credentialsRes, channelSessions, routerMemberRes, funisRes, acervoRes] =
+  const [versionsRes, credentialsRes, channelSessions, routerMemberRes, funisRes, acervoRes, conexoesRes] =
     await Promise.all([
       supabase
         .from("ai_agent_versions")
@@ -106,11 +107,22 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
         .eq("organization_id", activeOrg.orgId)
         .eq("is_active", true)
         .order("created_at", { ascending: true }),
+      // As conexões MCP externas vêm com a página pelo mesmo motivo dos funis
+      // e do acervo: a seção usa "nenhuma conexão" para dizer algo importante,
+      // e uma lista que chega vazia no primeiro render diria isso por engano.
+      // Só ATIVAS: uma desativada não é oferta válida pra marcar de novo.
+      supabase
+        .from("external_mcp_connections_safe")
+        .select("id, label, mcp_url, validated_at, validation_error")
+        .eq("organization_id", activeOrg.orgId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true }),
     ]);
 
   const versions = (versionsRes.data ?? []) as unknown as AgentVersionRow[];
   const funis = (funisRes.data ?? []) as unknown as FunilDaResposta[];
   const materiais = (acervoRes.data ?? []) as unknown as MaterialDoAcervo[];
+  const conexoesMcp = (conexoesRes.data ?? []) as unknown as ConexaoMcpDoAgente[];
 
   // Quanto de cada funil o assistente sabe percorrer (spec 17 passo 4). Vem
   // junto com a página porque a lacuna precisa aparecer no MESMO lugar em que o
@@ -177,6 +189,7 @@ export default async function AgentEditorPage({ params }: { params: Promise<{ id
         funis={funis}
         cobertura={cobertura}
         materiais={materiais}
+        conexoesMcp={conexoesMcp}
         routerMembership={routerMembership}
         readOnly={readOnly}
       />

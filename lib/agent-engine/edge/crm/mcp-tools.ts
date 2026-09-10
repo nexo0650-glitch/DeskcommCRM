@@ -16,11 +16,18 @@ import { claimOfJob } from '@/lib/agent-engine/queue/claim';
  *     desligada): o engine tem a própria request_human_handoff com silêncio
  *     durável + cancelamento de follow-ups — duas tools de handoff confundiriam
  *     o modelo e a variante do CRM não silencia o harness.
+ *
+ * Desde 2026-09-10, este turno também mescla ferramentas de CONEXÕES MCP
+ * EXTERNAS marcadas na tela (`agentConfig.mcpConnectionIds`) — ver
+ * `lib/mcp-cliente/ferramentas-do-turno.ts`. Mesmo ToolSet, mesma auditoria;
+ * a diferença é que a execução é uma chamada HTTP de verdade pra fora, não
+ * uma query neste banco.
  */
 import type { Tool } from 'ai';
 
 import { pickToolsFromMcp, type RuntimeHandoffSignal } from '@/lib/ai/runtime/tools';
 import { mintEphemeralToken, revokeEphemeralToken } from '@/lib/ai/runtime/mcp_token';
+import { buildExternalMcpTurnTools } from '@/lib/mcp-cliente/ferramentas-do-turno';
 import type { McpAuthResult } from '@/lib/mcp/auth';
 import type { McpContext } from '@/lib/mcp/types';
 
@@ -60,7 +67,10 @@ export async function buildMcpTurnTools(
       blocked_tool_ids: blocked,
     });
   }
-  if (allowed.length === 0) {
+  // `?? []` cobre o clone sem a 0237: sem a coluna, o agente segue sem
+  // conexões externas em vez de quebrar o turno.
+  const mcpConnectionIds = agentConfig.mcpConnectionIds ?? [];
+  if (allowed.length === 0 && mcpConnectionIds.length === 0) {
     return null;
   }
 
@@ -120,6 +130,17 @@ export async function buildMcpTurnTools(
     // tela e o card parado. Quem passava era só o dispatcher antigo.
     pipelineIds: agentConfig.pipelineIds,
   });
+
+  // Ferramentas de conexões MCP EXTERNAS (2026-09-10) — mescladas no MESMO
+  // ToolSet, não um segundo turno: pro modelo é uma lista de ferramentas só,
+  // e o nome `ext__<conexão>__<tool>` já evita colisão com o catálogo interno.
+  const externo = await buildExternalMcpTurnTools(cfg.supabase, ctx, mcpConnectionIds, {
+    readOnly: options?.readOnly,
+  });
+  for (const [name, t] of Object.entries(externo.tools)) {
+    if (name in tools) continue; // catálogo interno vence em qualquer colisão improvável
+    tools[name] = t;
+  }
 
   return {
     tools,

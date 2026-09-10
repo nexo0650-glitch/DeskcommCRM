@@ -20,11 +20,16 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export interface EscopoDaVersao {
   pipeline_ids?: string[];
   knowledge_source_ids?: string[];
+  mcp_connection_ids?: string[];
 }
 
 export type ResultadoDoEscopo =
   | { ok: true }
-  | { ok: false; campo: "pipeline_ids" | "knowledge_source_ids"; ausentes: string[] };
+  | {
+      ok: false;
+      campo: "pipeline_ids" | "knowledge_source_ids" | "mcp_connection_ids";
+      ausentes: string[];
+    };
 
 /**
  * Confere que todo id do escopo existe NESTA organização.
@@ -66,12 +71,34 @@ export async function validarEscopoDaVersao(
     if (ausentes.length > 0) return { ok: false, campo: "knowledge_source_ids", ausentes };
   }
 
+  const conexoes = escopo.mcp_connection_ids ?? [];
+  if (conexoes.length > 0) {
+    // `is_active` entra na conferência pelo mesmo motivo do acervo acima:
+    // marcar uma conexão DESATIVADA é a mesma configuração muda de marcar uma
+    // que não existe — o turno filtra por `is_active` na hora de montar as
+    // ferramentas (ver `buildExternalMcpTurnTools`), e a tela mostraria a
+    // marcação como se estivesse valendo.
+    const { data } = await supabase
+      .from("external_mcp_connections")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("is_active", true)
+      .in("id", conexoes);
+    const achados = new Set(((data ?? []) as Array<{ id: string }>).map((r) => r.id));
+    const ausentes = conexoes.filter((id) => !achados.has(id));
+    if (ausentes.length > 0) return { ok: false, campo: "mcp_connection_ids", ausentes };
+  }
+
   return { ok: true };
 }
 
 /** Frase para quem lê na tela — nunca o id cru sem contexto. */
 export function mensagemDoEscopo(r: Extract<ResultadoDoEscopo, { ok: false }>): string {
-  return r.campo === "pipeline_ids"
-    ? `Um dos funis marcados não existe mais nesta organização (${r.ausentes.length}). Recarregue a página e marque de novo.`
-    : `Um dos materiais marcados não existe mais, ou foi arquivado (${r.ausentes.length}). Recarregue a página e marque de novo.`;
+  if (r.campo === "pipeline_ids") {
+    return `Um dos funis marcados não existe mais nesta organização (${r.ausentes.length}). Recarregue a página e marque de novo.`;
+  }
+  if (r.campo === "knowledge_source_ids") {
+    return `Um dos materiais marcados não existe mais, ou foi arquivado (${r.ausentes.length}). Recarregue a página e marque de novo.`;
+  }
+  return `Uma das conexões marcadas não existe mais, ou foi desativada (${r.ausentes.length}). Recarregue a página e marque de novo.`;
 }

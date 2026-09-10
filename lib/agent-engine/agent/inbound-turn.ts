@@ -3219,7 +3219,14 @@ async function executarTurnoDoAgente(
   // ver edge/crm/mcp-tools.ts). As 8 tools do engine têm precedência de nome.
   let mcpCleanup: (() => Promise<void>) | null = null;
   try {
-    if (agentConfig !== null && agentConfig.toolIds.length > 0) {
+    // `mcpConnectionIds.length > 0` entra na condição desde 2026-09-10: um
+    // agente pode não ter nenhuma tool de catálogo marcada e ainda assim ter
+    // conexão MCP externa marcada — sem este segundo braço, buildMcpTurnTools
+    // nunca era chamado pra montar as ferramentas externas.
+    if (
+      agentConfig !== null &&
+      (agentConfig.toolIds.length > 0 || agentConfig.mcpConnectionIds.length > 0)
+    ) {
       try {
         // As de OPERAÇÃO saem antes de serem montadas, quando o Operador as tem.
         // Medido: são elas que carregavam 2 dos 3 vazamentos (o DADO que devolvem),

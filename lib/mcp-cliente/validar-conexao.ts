@@ -28,11 +28,20 @@
 import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
 
+import { parsearCorpoJsonRpc } from "./jsonrpc";
+
 const TIMEOUT_MS = 8000;
 
 export interface FerramentaExterna {
   name: string;
   description?: string;
+  /**
+   * JSON Schema cru que o SERVIDOR EXTERNO devolveu (não é Zod — vem de outro
+   * processo, de outro dono). Guardado para o turno do agente poder montar os
+   * parâmetros de verdade em vez de expor a ferramenta sem forma nenhuma.
+   * `unknown` de propósito: quem consome decide como validar/degradar.
+   */
+  inputSchema?: unknown;
 }
 
 export type ValidacaoDeConexao =
@@ -63,7 +72,13 @@ function ipEhPrivadoOuInterno(ip: string): boolean {
   return true; // não é IP válido nenhum — recusa por segurança, não libera.
 }
 
-async function urlEhSegura(urlBruta: string): Promise<{ ok: true } | { ok: false; error: string }> {
+/**
+ * Exportada: `chamar-ferramenta.ts` reusa a MESMA checagem a cada chamada de
+ * turno, não só na hora de salvar/testar a conexão — a URL gravada podia
+ * resolver público no dia do cadastro e privado agora (DNS rebinding), e uma
+ * chamada de turno é tráfego de verdade, não um teste manual de admin.
+ */
+export async function urlEhSegura(urlBruta: string): Promise<{ ok: true } | { ok: false; error: string }> {
   let url: URL;
   try {
     url = new URL(urlBruta);
@@ -138,22 +153,18 @@ export async function validarConexaoMcp(mcpUrl: string, apiKey: string): Promise
       return { ok: false, error: `nao_conseguiu_listar_ferramentas_${listar.status}` };
     }
     const texto = await listar.text();
-    // Resposta pode vir JSON puro OU como SSE (`Content-Type: text/event-stream`,
-    // servidor MCP em streamable-http): aí o JSON mora numa linha `data: {...}`,
-    // não numa linha que começa direto com `{`.
-    const linhaJson = texto
-      .split("\n")
-      .map((l) => l.trim())
-      .map((l) => (l.startsWith("data:") ? l.slice("data:".length).trim() : l))
-      .find((l) => l.startsWith("{"));
-    const corpo = JSON.parse(linhaJson ?? texto) as {
-      result?: { tools?: FerramentaExterna[] };
+    const corpo = parsearCorpoJsonRpc(texto) as {
+      result?: { tools?: Array<{ name: string; description?: string; inputSchema?: unknown }> };
       error?: { message?: string };
     };
     if (corpo.error) {
       return { ok: false, error: corpo.error.message ?? "erro_no_protocolo_mcp" };
     }
-    const ferramentas = corpo.result?.tools ?? [];
+    const ferramentas: FerramentaExterna[] = (corpo.result?.tools ?? []).map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+    }));
     return { ok: true, ferramentas };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.name : "network_error" };

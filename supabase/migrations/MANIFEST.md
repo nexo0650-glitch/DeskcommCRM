@@ -253,6 +253,7 @@ aplica.
 | `20260909030000` | `0234_servicos_de_remocao` | Tabela `remocao_servicos` própria (não mais em `catalog_products`): preço fixo por ida/ida-e-volta + taxa de saída única, ou preço por km acima de um limiar configurável por serviço. RLS + cerca de suporte com os nomes genéricos `support_write_insert/update/delete`. |
 | `20260909040000` | `0235_protocolo_de_remocao` | `crm_leads.protocol_number` (sequencial por org, atribuído por trigger em `organizations.next_lead_protocol_number`) — genérico de CRM, usado hoje pelo cálculo de orçamento de remoção pra criar um lead/protocolo novo a cada cotação completa, sem misturar pedidos do mesmo contato. |
 | `20260910010000` | `0236_conexoes_mcp_externas` | `external_mcp_connections` — URL + chave cifrada por organização pra conectar a servidor MCP de outro sistema, validada de verdade antes de ativar. Mesmo molde de `ai_provider_credentials`/`map_provider_credentials`, sem enum de provider fixo. |
+| `20260910020000` | `0237_mcp_connection_ids_do_agente` | `ai_agent_versions.mcp_connection_ids` — em quais conexões MCP externas (0236) o Conversador deste agente pode chamar ferramenta durante a conversa. Vazio = nenhuma. Trigger de imutabilidade estendido. |
 
 ## Reproducibility
 

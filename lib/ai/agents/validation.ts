@@ -163,6 +163,17 @@ const versionShapeSchema = z
      * organização é o servidor.
      */
     knowledge_source_ids: z.array(z.string().uuid()).default([]),
+    /**
+     * Conexões MCP externas (`external_mcp_connections`) que o Conversador
+     * pode chamar durante a conversa (2026-09-10). Vazio = NENHUMA.
+     *
+     * Sem `.refine()` de existência, mesmo motivo de `pipeline_ids`/
+     * `knowledge_source_ids`: conexão é linha de tabela, e um schema
+     * compartilhado com o browser não faz consulta cross-row. Quem confere
+     * que a conexão existe, é ATIVA e é desta organização é o servidor —
+     * `validarEscopoDaVersao`.
+     */
+    mcp_connection_ids: z.array(z.string().uuid()).default([]),
   })
   .strict();
 

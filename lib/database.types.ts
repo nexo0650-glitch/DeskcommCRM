@@ -749,6 +749,7 @@ export type Database = {
           id: string
           knowledge_source_ids: string[]
           max_steps: number
+          mcp_connection_ids: string[]
           model: string
           multimodal_input: boolean
           operator_enabled: boolean
@@ -786,6 +787,7 @@ export type Database = {
           id?: string
           knowledge_source_ids?: string[]
           max_steps?: number
+          mcp_connection_ids?: string[]
           model: string
           multimodal_input?: boolean
           operator_enabled?: boolean
@@ -823,6 +825,7 @@ export type Database = {
           id?: string
           knowledge_source_ids?: string[]
           max_steps?: number
+          mcp_connection_ids?: string[]
           model?: string
           multimodal_input?: boolean
           operator_enabled?: boolean

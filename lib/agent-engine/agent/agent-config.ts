@@ -79,6 +79,14 @@ export interface PublishedAgentConfig {
    */
   pipelineIds: string[];
   /**
+   * Conexões MCP externas (`external_mcp_connections`) que o CONVERSADOR pode
+   * chamar durante a conversa (2026-09-10). Vazio = NENHUMA — falha fechada,
+   * mesma direção de `pipelineIds`. Não confundir com `operatorToolIds`: o
+   * papel Operador não herda isto (a chamada do turno do Operador zera este
+   * campo de propósito, mesma separação da spec 16 §3.2).
+   */
+  mcpConnectionIds: string[];
+  /**
    * Horário de funcionamento declarado na tela (`trigger_config.filters.business_hours`).
    * `null` = atende a qualquer hora. Quem obedece é o turno inbound, adiando o
    * job para a abertura — ver `janela-de-atendimento.ts` para o defeito que isto
@@ -117,6 +125,7 @@ interface Row {
   operator_model: string | null;
   operator_tool_ids: string[] | null;
   pipeline_ids: string[] | null;
+  mcp_connection_ids: string[] | null;
   knowledge_source_ids: string[] | null;
   trigger_config: unknown;
   version_created_by: string | null;
@@ -146,6 +155,7 @@ const SELECT_AGENT_CONFIG_COLUMNS = `a.operation_mode,a.paused_at,a.operation_re
             v.operator_model,
             v.operator_tool_ids,
             v.pipeline_ids,
+            v.mcp_connection_ids,
             v.knowledge_source_ids,
             v.trigger_config,
             v.created_by as version_created_by,
@@ -212,6 +222,9 @@ function mapAgentConfigRow(r: Row): PublishedAgentConfig {
     // `?? []` = NENHUM funil. O clone que ainda não aplicou a 0125 nasce
     // fechado — a direção segura é agir de menos (mesma decisão da linha acima).
     pipelineIds: r.pipeline_ids ?? [],
+    // `?? []` cobre o clone sem a 0237: sem a coluna, o Conversador segue sem
+    // conexões externas — mesma direção segura das linhas acima.
+    mcpConnectionIds: r.mcp_connection_ids ?? [],
     // Leitura DEFENSIVA e que falha ABERTA: jsonb livre com shape estranho vira
     // `null` (sem janela ⇒ atende sempre), nunca uma mordaça acidental.
     janelaDeAtendimento: lerJanelaDeAtendimento(r.trigger_config),

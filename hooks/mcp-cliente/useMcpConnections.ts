@@ -11,7 +11,7 @@ export interface McpConnectionRow {
   api_key_last4: string | null;
   validated_at: string | null;
   validation_error: string | null;
-  tools_encontradas: Array<{ name: string; description?: string }>;
+  tools_encontradas: Array<{ name: string; description?: string; inputSchema?: unknown }>;
   is_active: boolean;
   created_by: string | null;
   created_at: string;

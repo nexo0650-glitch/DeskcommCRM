@@ -48,6 +48,7 @@ import { FollowupFlowPicker } from "./FollowupFlowPicker";
 import { PainelDoOperador } from "./PainelDoOperador";
 import { PainelDeSeguranca } from "./PainelDeSeguranca";
 import { BasesDoAgente, type MaterialDoAcervo } from "./BasesDoAgente";
+import { ConexoesDoAgente, type ConexaoMcpDoAgente } from "./ConexoesDoAgente";
 import { FunisDoAgente, type CoberturaPorFunil } from "./FunisDoAgente";
 import { PublishConfirmDialog } from "./PublishConfirmDialog";
 import {
@@ -129,6 +130,14 @@ type Props = (EditProps | CreateProps) & {
    * algo importante.
    */
   materiais?: MaterialDoAcervo[];
+  /**
+   * As conexões MCP externas ATIVAS da organização, para o assistente
+   * escolher quais pode chamar (2026-09-10). Vem por PROP pelo mesmo motivo
+   * dos funis e do acervo: a página já é server component, e "nenhuma
+   * conexão" é exatamente o estado que esta seção usa para dizer algo
+   * importante.
+   */
+  conexoesMcp?: ConexaoMcpDoAgente[];
 };
 
 interface FormState {
@@ -160,6 +169,7 @@ interface FormState {
   operator_tool_ids: string[];
   pipeline_ids: string[];
   knowledge_source_ids: string[];
+  mcp_connection_ids: string[];
 }
 
 interface FollowupValue {
@@ -224,6 +234,8 @@ function buildState(args: {
     pipeline_ids: version?.pipeline_ids ?? [],
     // `?? []` = nenhum material. Mesma direção segura: agir de menos.
     knowledge_source_ids: version?.knowledge_source_ids ?? [],
+    // `?? []` = nenhuma conexão externa. Mesma direção segura: agir de menos.
+    mcp_connection_ids: version?.mcp_connection_ids ?? [],
   };
 }
 
@@ -275,6 +287,7 @@ function toVersionPayload(s: FormState) {
     operator_tool_ids: s.operator_tool_ids,
     pipeline_ids: s.pipeline_ids,
     knowledge_source_ids: s.knowledge_source_ids,
+    mcp_connection_ids: s.mcp_connection_ids,
   };
 }
 
@@ -282,6 +295,7 @@ export function AgentForm(props: Props) {
   const t = useT();
   const funis = props.funis ?? [];
   const materiais = props.materiais ?? [];
+  const conexoesMcp = props.conexoesMcp ?? [];
   const router = useRouter();
   const isEdit = props.mode === "edit";
   const readOnly = props.readOnly ?? false;
@@ -999,6 +1013,14 @@ export function AgentForm(props: Props) {
             materiais={materiais}
             value={form.knowledge_source_ids}
             onChange={(ids) => patch({ knowledge_source_ids: ids })}
+            disabled={disabled}
+          />
+
+          {/* Outros sistemas que este assistente pode chamar via MCP (2026-09-10) */}
+          <ConexoesDoAgente
+            conexoes={conexoesMcp}
+            value={form.mcp_connection_ids}
+            onChange={(ids) => patch({ mcp_connection_ids: ids })}
             disabled={disabled}
           />
 
