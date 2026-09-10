@@ -37,6 +37,32 @@ import type { Idioma } from "./idiomas";
 type Traducoes = Record<string, Partial<Record<Exclude<Idioma, "pt-BR">, string>>>;
 
 export const DICIONARIO: Traducoes = {
+  // --- Página inicial / marketing (app/page.tsx) ---
+  "Atendimento por WhatsApp com IA": { es: "Atención por WhatsApp con IA" },
+  "O agente responde na hora, entende o histórico da conversa e nunca deixa o cliente esperando — dia e noite, sem escala.": { es: "El agente responde al instante, entiende el historial de la conversación y nunca deja al cliente esperando — de día y de noche, sin turnos." },
+  "Funil de vendas visual": { es: "Embudo de ventas visual" },
+  "Cada conversa vira um card que anda sozinho pelas etapas do funil, junto com o que a sua equipe já faz hoje.": { es: "Cada conversación se convierte en una tarjeta que avanza sola por las etapas del embudo, junto con lo que tu equipo ya hace hoy." },
+  "Agenda que se preenche sozinha": { es: "Agenda que se completa sola" },
+  "O agente marca, remarca e cancela horário direto na conversa, sem ninguém precisar copiar nada pra planilha.": { es: "El agente agenda, reprograma y cancela horarios directo en la conversación, sin que nadie tenga que copiar nada a una planilla." },
+  "Catálogo sempre atualizado": { es: "Catálogo siempre actualizado" },
+  "Produtos, serviços e preço exato — o agente responde com o valor certo, nunca um chute de cabeça.": { es: "Productos, servicios y precio exacto — el agente responde con el valor correcto, nunca una suposición al azar." },
+  "Ninguém fica sem resposta": { es: "Nadie se queda sin respuesta" },
+  "Follow-up automático retoma quem parou de responder, antes que o cliente esfrie e procure outro lugar.": { es: "El seguimiento automático retoma a quien dejó de responder, antes de que el cliente se enfríe y busque en otro lugar." },
+  "A IA chama a equipe quando precisa": { es: "La IA llama al equipo cuando lo necesita" },
+  "Nos casos que exigem uma pessoa, o agente entrega a conversa com o contexto pronto — ninguém começa do zero.": { es: "En los casos que requieren una persona, el agente entrega la conversación con el contexto listo — nadie empieza de cero." },
+  "Sua equipe, com papéis diferentes": { es: "Tu equipo, con roles diferentes" },
+  "Convide quem atende, quem gerencia e quem administra — cada um vê e faz só o que precisa.": { es: "Invita a quien atiende, a quien gestiona y a quien administra — cada uno ve y hace solo lo que necesita." },
+  "Veja o que está funcionando": { es: "Mira lo que está funcionando" },
+  "Relatórios de atendimento e vendas pra decidir com número, não com impressão.": { es: "Informes de atención y ventas para decidir con números, no con impresiones." },
+  "Dados protegidos, empresa por empresa": { es: "Datos protegidos, empresa por empresa" },
+  "Isolamento total entre organizações e conformidade com a LGPD desde o primeiro dia.": { es: "Aislamiento total entre organizaciones y cumplimiento de la LGPD desde el primer día." },
+  "Atenda, venda e cresça pelo WhatsApp com IA": { es: "Atiende, vende y crece por WhatsApp con IA" },
+  "Um sistema de vendas com agentes de IA nativos que atendem, qualificam e movem o funil junto com a sua equipe — sem deixar ninguém sem resposta.": { es: "Un sistema de ventas con agentes de IA nativos que atienden, califican y mueven el embudo junto con tu equipo — sin dejar a nadie sin respuesta." },
+  "Criar empresa grátis": { es: "Crear empresa gratis" },
+  "Já tenho conta": { es: "Ya tengo cuenta" },
+  "Tudo que a operação de vendas precisa, num só lugar": { es: "Todo lo que la operación de ventas necesita, en un solo lugar" },
+  "Comece a atender pelo WhatsApp hoje": { es: "Empieza a atender por WhatsApp hoy" },
+  "Crie sua empresa em minutos — sem cartão de crédito.": { es: "Crea tu empresa en minutos — sin tarjeta de crédito." },
   "Atendimento e vendas por WhatsApp, com agentes de IA.": {
     es: "Atención y ventas por WhatsApp, con agentes de IA.",
   },
