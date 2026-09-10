@@ -19,8 +19,6 @@ import { normalizarIdioma } from "@/lib/i18n/idiomas";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { IdiomaProvider } from "@/lib/i18n/IdiomaProvider";
 
-export const metadata = { title: "Atendimento e vendas por WhatsApp com IA" };
-
 /**
  * A PORTA DE ENTRADA — página de marketing de verdade, não só um convite pra
  * entrar. Fora do grupo `(public)` de propósito: aquela casca trava a largura
