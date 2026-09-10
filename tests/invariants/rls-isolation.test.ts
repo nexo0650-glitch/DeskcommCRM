@@ -248,6 +248,15 @@ beforeAll(() => {
             values (v_org, 'openrouteservice', 'RLS invariant', '\\x00'::bytea, '\\x00'::bytea, '\\x00'::bytea, '0000');
         end if;
 
+        -- migration 0236 — conexão com servidor MCP de outro sistema, por
+        -- organização. Mesmo molde de map_provider_credentials: cifrado real
+        -- não importa aqui, a prova é de isolamento de linha.
+        if not exists (select 1 from public.external_mcp_connections where organization_id = v_org) then
+          insert into public.external_mcp_connections
+            (organization_id, label, mcp_url, api_key_encrypted, api_key_iv, api_key_tag, api_key_last4)
+            values (v_org, 'RLS invariant', 'https://mcp.exemplo.test/rls-' || v_org::text, '\\x00'::bytea, '\\x00'::bytea, '\\x00'::bytea, '0000');
+        end if;
+
         if not exists (select 1 from public.push_subscriptions where organization_id = v_org) then
           insert into public.push_subscriptions
             (organization_id, user_id, endpoint, p256dh, auth)
@@ -319,6 +328,11 @@ export const TABLES = [
   // decifragem em si nunca sai do servidor, então não há segundo eixo aqui
   // como há em ai_provider_credentials (0207).
   "map_provider_credentials",
+  // 0236 — conexão com servidor MCP de outro sistema, por organização. Leitura
+  // é org-scoped sem gate de papel (mesma forma de map_provider_credentials);
+  // a decifragem em si nunca sai do servidor, e a ESCRITA exige `admin` — esse
+  // segundo eixo não é medido aqui pelo mesmo motivo de `crm_tasks` acima.
+  "external_mcp_connections",
   // ⚠️ `webhook_lead_captures` (migration 0174) NÃO entra nesta lista, e a
   // ausência é deliberada: a policy dela exige `manager`, e o usuário semeado
   // aqui é `agent` — o controle positivo falharia por ACERTO, e a "correção"

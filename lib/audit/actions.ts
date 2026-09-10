@@ -459,6 +459,11 @@ export const AUDIT_ACTIONS = [
   "removal_service.updated",
   "removal_service.deleted",
 
+  // Conexões MCP com sistemas externos (migration 0236).
+  "mcp_connection.created",
+  "mcp_connection.deleted",
+  "mcp_connection.revalidated",
+
   // As tarefas do CRM (migration 0210). Tarefa é combinado de trabalho entre
   // pessoas do time — quem a criou, quem mudou o prazo e quem a apagou é
   // exatamente o que se disputa depois de um cliente ficar sem retorno.

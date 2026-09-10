@@ -343,6 +343,21 @@ export const NAV_CATALOG = [
     minRole: "manager",
   },
   {
+    // Guarda a credencial (URL + chave) de um servidor MCP externo, por
+    // organização — mesmo papel que Chave de mapa: infraestrutura de conexão
+    // isolada do consumo. O consumo (o agente desta org chamando as
+    // ferramentas de lá durante uma conversa) é trabalho separado, ainda não
+    // construído — sem essa credencial validada aqui, ele nem teria como
+    // existir.
+    href: "/app/ai/mcp-connections",
+    label: "Outros sistemas",
+    description: "Conecte outro sistema que fale o protocolo MCP — cole a URL e a chave.",
+    icon: "PlugsConnected",
+    group: "ia",
+    section: "Montar o agente",
+    minRole: "manager",
+  },
+  {
     // O sistema chama modelo em 23 lugares e, até esta tela, a escolha vivia
     // espalhada por três pilhas de código e sete variáveis de ambiente — não
     // havia onde responder "quem usa IA aqui, e com qual chave?".
