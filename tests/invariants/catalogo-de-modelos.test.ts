@@ -62,7 +62,16 @@ describe("catálogo de modelos", () => {
         where is_default_for_provider group by provider order by provider;`,
     );
     const padroes = out.split("\n").map((l) => l.trim()).filter(Boolean);
-    expect(padroes.sort()).toEqual(["anthropic=1", "google=1", "openai=1"]);
+    // openrouter fica de fora de propósito: o catálogo dela é sincronizado por
+    // cron contra a API real, não semeado no baseline — um install fresco não
+    // tem nenhuma linha dela até o cron rodar.
+    expect(padroes.sort()).toEqual([
+      "anthropic=1",
+      "google=1",
+      "groq=1",
+      "nvidia=1",
+      "openai=1",
+    ]);
   });
 
   it("o padrão de cada provedor não está depreciado", () => {
