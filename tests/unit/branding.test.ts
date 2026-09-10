@@ -245,6 +245,12 @@ const MARCA_CONGELADA: Record<string, EntradaDeMarca> = {
       "User-Agent exigido pela Nuvemshop, que identifica a aplicação registrada na plataforma deles. Trocar pelo nome do revendedor descreveria uma aplicação que não existe lá",
     marcas: ["deskcommcrm"],
   },
+  "lib/mcp-cliente/validar-conexao.ts": {
+    categoria: "PROTOCOLO",
+    motivo:
+      "`clientInfo.name` do handshake `initialize` do protocolo MCP, enviado ao servidor de OUTRO sistema pra se identificar quem está conectando. Não é texto de interface e nunca chega ao usuário — é o mesmo papel de `X-Client-Info` em lib/supabase/admin.ts",
+    marcas: ["deskcommcrm"],
+  },
   "lib/agenda/google/evento.ts": {
     categoria: "PROTOCOLO",
     motivo:
