@@ -138,9 +138,13 @@ export async function validarConexaoMcp(mcpUrl: string, apiKey: string): Promise
       return { ok: false, error: `nao_conseguiu_listar_ferramentas_${listar.status}` };
     }
     const texto = await listar.text();
+    // Resposta pode vir JSON puro OU como SSE (`Content-Type: text/event-stream`,
+    // servidor MCP em streamable-http): aí o JSON mora numa linha `data: {...}`,
+    // não numa linha que começa direto com `{`.
     const linhaJson = texto
       .split("\n")
       .map((l) => l.trim())
+      .map((l) => (l.startsWith("data:") ? l.slice("data:".length).trim() : l))
       .find((l) => l.startsWith("{"));
     const corpo = JSON.parse(linhaJson ?? texto) as {
       result?: { tools?: FerramentaExterna[] };
